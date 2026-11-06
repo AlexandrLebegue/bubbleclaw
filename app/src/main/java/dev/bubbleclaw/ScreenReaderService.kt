@@ -248,6 +248,21 @@ class ScreenReaderService : AccessibilityService() {
         }
     }
 
+    fun performEnter(): String {
+        if (instance == null) return NOT_CONNECTED
+        val root = rootInActiveWindow ?: return "Aucune fenêtre active."
+        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            ?: root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+            ?: return "Aucun champ actif."
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            focused.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+        ) {
+            "Touche Entrée envoyée."
+        } else {
+            "Impossible d'envoyer Entrée."
+        }
+    }
+
     fun openApp(query: String): String {
         val pm = packageManager
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)

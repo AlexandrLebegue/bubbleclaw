@@ -13,7 +13,8 @@ data class ScreenContextInfo(
     val width: Int,
     val height: Int,
     val visibleText: String?,
-    val accessibilityMissing: Boolean = false
+    val accessibilityMissing: Boolean = false,
+    val appPackage: String? = null
 ) {
     fun summary(): String {
         val app = appName?.takeIf { it.isNotBlank() } ?: "Application inconnue"
