@@ -3,6 +3,7 @@ package dev.bubbleclaw
 import android.app.Dialog
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
@@ -15,7 +16,6 @@ import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -30,8 +30,12 @@ import java.util.Locale
 class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     private lateinit var viewModel: ChatViewModel
-    private lateinit var root: LinearLayout
-    private lateinit var scroll: ScrollView
+    private lateinit var root: FrameLayout
+    private lateinit var panel: LinearLayout
+    private lateinit var headerRow: LinearLayout
+    private lateinit var inputRow: LinearLayout
+    private lateinit var contextCard: LinearLayout
+    private lateinit var scroll: MaxHeightScrollView
     private lateinit var container: LinearLayout
     private lateinit var statusText: TextView
     private lateinit var input: EditText
@@ -56,8 +60,18 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        window.setDimAmount(0f)
+        window.setLayout(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT
+        )
 
         root = findViewById(R.id.chat_root)
+        panel = findViewById(R.id.chat_panel)
+        headerRow = findViewById(R.id.header_row)
+        inputRow = findViewById(R.id.input_row)
+        contextCard = findViewById(R.id.context_card)
         scroll = findViewById(R.id.scroll)
         container = findViewById(R.id.messages_container)
         statusText = findViewById(R.id.status_text)
@@ -79,12 +93,27 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             )
         )
 
+        val bubbleAtBottom = intent.getBooleanExtra(BubbleService.EXTRA_BUBBLE_AT_BOTTOM, false)
+        val panelParams = panel.layoutParams as FrameLayout.LayoutParams
+        panelParams.gravity = if (bubbleAtBottom) {
+            Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        } else {
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        }
+        panel.layoutParams = panelParams
+        panel.setOnClickListener { }
+
+        root.setOnClickListener { finish() }
+
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime()
-            )
-            view.setPadding(0, bars.top, 0, bars.bottom)
+            val system = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            view.setPadding(0, system.top, 0, maxOf(system.bottom, ime.bottom))
+            view.post { updatePanelGeometry() }
             insets
+        }
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            updatePanelGeometry()
         }
 
         viewModel = ViewModelProvider(this).get(ChatViewModel::class.java)
@@ -192,6 +221,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         val messages = viewModel.messages()
         if (messages.size != renderedCount) {
             container.removeAllViews()
+            if (messages.isEmpty()) addEmptyState()
             for (message in messages) addMessageView(message)
             renderedCount = messages.size
             streamingView = null
@@ -235,6 +265,39 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         }
 
         scrollToBottom()
+    }
+
+    private fun addEmptyState() {
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(12), dp(22), dp(12), dp(22))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        val slot = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(96), dp(96))
+        }
+        slot.addView(
+            LobsterView(this).apply { mood = LobsterMood.Idle },
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        column.addView(slot)
+        column.addView(
+            TextView(this).apply {
+                text = getString(R.string.chat_empty_welcome)
+                setTextColor(ContextCompat.getColor(this@ChatActivity, R.color.text_secondary))
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setPadding(dp(16), dp(10), dp(16), 0)
+            }
+        )
+        container.addView(column)
     }
 
     private fun addMessageView(message: ChatMessage) {
@@ -364,6 +427,21 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         )
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         dialog.show()
+    }
+
+    private fun updatePanelGeometry() {
+        val metrics = resources.displayMetrics
+        val targetWidth = minOf((metrics.widthPixels * 0.92f).toInt(), dp(420))
+        if (panel.layoutParams.width != targetWidth) {
+            panel.layoutParams = panel.layoutParams.apply { width = targetWidth }
+        }
+        val available = root.height - root.paddingTop - root.paddingBottom
+        if (available <= 0) return
+        val maxPanel = (available * 0.62f).toInt()
+        val contextHeight = if (contextCard.visibility == View.VISIBLE) contextCard.measuredHeight else 0
+        val fixed = headerRow.measuredHeight + contextHeight + inputRow.measuredHeight
+        val maxScroll = (maxPanel - fixed).coerceAtLeast(dp(180))
+        scroll.maxHeight = maxScroll
     }
 
     private fun shorten(value: String, max: Int): String =

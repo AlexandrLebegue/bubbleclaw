@@ -33,6 +33,7 @@ class BubbleService : Service() {
         const val EXTRA_IMAGE_PATH = "extra_image_path"
         const val EXTRA_THUMB_PATH = "extra_thumb_path"
         const val EXTRA_CONTEXT = "extra_context"
+        const val EXTRA_BUBBLE_AT_BOTTOM = "extra_bubble_at_bottom"
 
         private const val CHANNEL_ID = "bubble"
         private const val NOTIFICATION_ID = 1
@@ -337,11 +338,14 @@ class BubbleService : Service() {
     private fun openChat(info: ScreenContextInfo) {
         ContextHolder.put(info)
         bubbleView?.state = BubbleState.Idle
+        val screenHeight = resources.displayMetrics.heightPixels
+        val bubbleCenter = (params?.y ?: 0) + dp(64) / 2
         val intent = Intent(this, ChatActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(EXTRA_IMAGE_PATH, info.imagePath)
             putExtra(EXTRA_THUMB_PATH, info.thumbPath)
             putExtra(EXTRA_CONTEXT, info.summary())
+            putExtra(EXTRA_BUBBLE_AT_BOTTOM, bubbleCenter > screenHeight / 2)
         }
         runCatching { startActivity(intent) }
     }
