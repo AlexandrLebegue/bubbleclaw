@@ -111,6 +111,13 @@ class SettingsActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == Permissions.REQUEST_NOTIFICATIONS) {
+            if (grantResults.isNotEmpty() && grantResults[0] != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(
+                    this,
+                    "Notifications refusées : Android peut masquer l'état de la bulle.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
             Permissions.buildChecklist(this, findViewById(R.id.permissions_container))
         }
     }

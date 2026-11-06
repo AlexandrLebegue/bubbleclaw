@@ -50,7 +50,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     @Volatile
-    var status: String = "En ligne"
+    var status: String = "Prêt"
         private set
 
     @Volatile
@@ -126,7 +126,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         main.post {
             streamingText = ""
             isStreaming = false
-            status = "En ligne"
+            status = "Prêt"
             BubbleService.setState(BubbleState.Idle)
             notifyChanged()
         }
@@ -142,7 +142,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         pendingContext = null
         streamingText = ""
         isStreaming = false
-        status = "En ligne"
+        status = "Prêt"
         synchronized(imageCache) { imageCache.clear() }
         BubbleService.setState(BubbleState.Idle)
         persistence.execute { ConversationStore.clear(appContext) }
@@ -161,7 +161,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val turn = generation
         isStreaming = true
         streamingText = ""
-        status = "En ligne"
+        status = "Connexion…"
         BubbleService.setState(BubbleState.Thinking)
         notifyChanged()
         executor.execute { runTurn(turn) }

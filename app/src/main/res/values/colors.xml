@@ -9,11 +9,8 @@
     <color name="text_secondary">#B9AEB2</color>
     <color name="danger">#FF6B6B</color>
     <color name="success">#69D98B</color>
-    <color name="scrim">#CC0E0B10</color>
-    <color name="chat_bg">#F5141013</color>
     <color name="chat_panel">#FF1B1518</color>
     <color name="chat_panel_border">#33FF5A4E</color>
-    <color name="chat_scrim">#59000000</color>
     <color name="chat_opaque">#F2141013</color>
     <color name="user_bubble">#FF5A4E</color>
 </resources>
