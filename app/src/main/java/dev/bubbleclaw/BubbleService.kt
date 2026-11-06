@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.IBinder
@@ -75,10 +76,16 @@ class BubbleService : Service() {
 
         fun onChatOpened(activity: ChatActivity) {
             chatActivity = WeakReference(activity)
+            instance?.bubbleView?.contentDescription =
+                instance?.getString(R.string.bubble_description_close)
         }
 
         fun onChatClosed(activity: ChatActivity) {
-            if (chatActivity?.get() === activity) chatActivity = null
+            if (chatActivity?.get() === activity) {
+                chatActivity = null
+                instance?.bubbleView?.contentDescription =
+                    instance?.getString(R.string.bubble_description_open)
+            }
         }
 
         fun isChatOpen(): Boolean {
@@ -90,6 +97,12 @@ class BubbleService : Service() {
             val activity = chatActivity?.get() ?: return
             if (activity.isFinishing || activity.isDestroyed) return
             activity.requestCloseFromBubble()
+        }
+
+        fun clearChatIfOpen() {
+            val activity = chatActivity?.get() ?: return
+            if (activity.isFinishing || activity.isDestroyed) return
+            activity.clearConversationFromOutside()
         }
 
         fun sinkBubble() {
@@ -142,8 +155,23 @@ class BubbleService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (!AppPrefs.bubbleEnabled) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (bubbleView == null) addBubble()
         return START_STICKY
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val layout = params ?: return
+        val size = dp(64)
+        val width = resources.displayMetrics.widthPixels
+        val height = resources.displayMetrics.heightPixels
+        layout.x = if (AppPrefs.bubbleOnLeft) 0 else (width - size).coerceAtLeast(0)
+        clampY(layout, height)
+        updateLayout(layout)
     }
 
     override fun onDestroy() {
@@ -205,7 +233,9 @@ class BubbleService : Service() {
         val width = metrics.widthPixels
         val height = metrics.heightPixels
 
-        val view = LobsterBubbleView(this)
+        val view = LobsterBubbleView(this).apply {
+            contentDescription = getString(R.string.bubble_description_open)
+        }
         val layout = WindowManager.LayoutParams(
             size,
             size,
@@ -215,7 +245,7 @@ class BubbleService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = width - size - dp(6)
+            x = if (AppPrefs.bubbleOnLeft) 0 else (width - size).coerceAtLeast(0)
             y = AppPrefs.bubbleY.takeIf { it >= 0 } ?: (height / 3)
         }
         clampY(layout, height)
@@ -280,6 +310,7 @@ class BubbleService : Service() {
         val center = layout.x + size / 2
         val target = if (center < width / 2) 0 else width - size
         AppPrefs.bubbleY = layout.y
+        AppPrefs.bubbleOnLeft = target == 0
         snapAnimator?.cancel()
         snapAnimator = android.animation.ValueAnimator.ofInt(layout.x, target).apply {
             duration = 180
@@ -465,7 +496,15 @@ class BubbleService : Service() {
                 MENU_OPEN -> onBubbleTap()
                 MENU_CONTROL -> {
                     AppPrefs.controlMode = !AppPrefs.controlMode
-                    val message = if (AppPrefs.controlMode) "Mode contrôle activé" else "Mode contrôle désactivé"
+                    val message = if (AppPrefs.controlMode) {
+                        if (ScreenReaderService.instance == null) {
+                            "Mode contrôle activé — active le service d'accessibilité pour agir."
+                        } else {
+                            "Mode contrôle activé"
+                        }
+                    } else {
+                        "Mode contrôle désactivé"
+                    }
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 }
                 MENU_SETTINGS -> startActivity(
@@ -492,6 +531,7 @@ class BubbleService : Service() {
             .setNegativeButton(getString(R.string.chat_clear_no), null)
             .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
                 ConversationStore.clear(this)
+                clearChatIfOpen()
                 Toast.makeText(this, getString(R.string.chat_cleared), Toast.LENGTH_SHORT).show()
             }
             .show()

@@ -95,8 +95,8 @@ class MainActivity : AppCompatActivity() {
             )
             return
         }
-        BubbleService.start(this)
         AppPrefs.bubbleEnabled = true
+        BubbleService.start(this)
         if (!Permissions.accessibilityEnabled(this)) {
             Toast.makeText(
                 this,

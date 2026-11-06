@@ -80,8 +80,8 @@
 
             <ImageButton
                 android:id="@+id/retake_context"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/chat_retake_context"
                 android:padding="9dp"
@@ -90,8 +90,8 @@
 
             <TextView
                 android:id="@+id/close_button"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/close"
                 android:gravity="center"

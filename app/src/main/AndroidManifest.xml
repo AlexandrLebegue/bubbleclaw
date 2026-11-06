@@ -47,6 +47,15 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".BubbleService"
             android:exported="false"

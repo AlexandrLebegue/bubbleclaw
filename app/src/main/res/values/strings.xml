@@ -8,12 +8,15 @@
     <string name="bubble_notification_title">BubbleClaw est actif</string>
     <string name="bubble_notification_text">Touchez le homard pour discuter.</string>
     <string name="bubble_notification_stop">Arrêter</string>
+    <string name="bubble_description_open">Bulle BubbleClaw. Touche pour ouvrir la discussion, appui long pour le menu.</string>
+    <string name="bubble_description_close">Discussion ouverte. Touche pour la fermer, appui long pour le menu.</string>
 
     <string name="chat_title">OpenClaw</string>
     <string name="chat_online">En ligne</string>
     <string name="chat_offline">Injoignable</string>
     <string name="chat_hint">Pose ta question…</string>
     <string name="chat_send">Envoyer</string>
+    <string name="chat_cancel">Annuler la réponse</string>
     <string name="chat_retry">Réessayer</string>
     <string name="chat_tool_limit">Trop d\'actions enchaînées, je m\'arrête là. Reformule ou relance.</string>
     <string name="chat_context_prefix">[Contexte écran]</string>
@@ -28,6 +31,7 @@
     <string name="chat_clear_yes">Effacer</string>
     <string name="chat_clear_no">Annuler</string>
     <string name="chat_cleared">Conversation effacée</string>
+    <string name="chat_message_copied">Message copié.</string>
 
     <string name="settings_title">Réglages</string>
     <string name="settings_gateway">Gateway OpenClaw</string>
@@ -74,5 +78,7 @@
     <string name="menu_clear_chat">Effacer la conversation</string>
 
     <string name="screenshot_fullscreen">Capture</string>
+    <string name="screenshot_fullscreen_description">Capture de l\'écran. Touche pour fermer.</string>
     <string name="close">Fermer</string>
+    <string name="back">Retour</string>
 </resources>
