@@ -12,7 +12,9 @@ contexte de ce que tu regardais, puis discute avec ton agent.
 ## Ce que ça fait
 
 - **Bulle persistante** (`BubbleService`) en service de premier plan, draggable,
-  qui se colle au bord le plus proche et mémorise sa position verticale.
+  qui se colle au bord le plus proche et mémorise sa position verticale et son
+  côté (gauche/droite), y compris après rotation. Si elle était active au
+  redémarrage, `BootReceiver` la relance après un reboot.
 - **Capture d'écran sans popup MediaProjection** via l'API Accessibility
   (`takeScreenshot`, Android 11+), image réduite à 1080 px de large, JPEG q70,
   plus une vignette 320 px.
@@ -47,7 +49,12 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   à la création et libéré à la destruction (rotation, retour arrière, fermeture
   par tap extérieur), donc une activité morte ne bloque jamais la bulle.
 - **Chat en streaming SSE** vers `chat/completions`, avec repli automatique en
-  non-streaming, messages d'erreur en français et bouton « Réessayer ».
+  non-streaming, messages d'erreur en français et bouton « Réessayer ». Pendant
+  une réponse, le bouton d'envoi devient « Annuler la réponse » : il coupe la
+  connexion en cours, efface le texte partiel et rend la main immédiatement.
+- **Copie et lisibilité** : un appui long sur une bulle de message copie son
+  contenu. Les messages utilisateur utilisent un texte sombre sur le corail
+  pour rester lisibles (contraste renforcé).
 - **Conversation persistante** : le fil est enregistré dans
   `filesDir/conversation.json` (écriture atomique par fichier temporaire puis
   `rename`), rechargé à chaque ouverture, et survit donc à la fermeture du
@@ -146,8 +153,9 @@ ou l'erreur réseau en français.
 - **Notifications** (Android 13+) : notification du service de premier plan, avec
   une action « Arrêter ».
 - **Internet** : uniquement vers le gateway configuré.
-- **RECEIVE_BOOT_COMPLETED** est déclarée dans le manifeste pour un usage futur ;
-  aucun receiver ne redémarre la bulle automatiquement pour l'instant.
+- **RECEIVE_BOOT_COMPLETED** : `BootReceiver` relance la bulle au démarrage du
+  téléphone si elle était active et si l'autorisation d'overlay est toujours
+  accordée.
 
 L'écran principal et les réglages affichent une checklist **en direct** de ces
 autorisations, avec un bouton par ligne. Si le service d'accessibilité est coupé,
@@ -161,6 +169,8 @@ app/src/main/java/dev/bubbleclaw/
   AppPrefs.kt             SharedPreferences (URL, jeton, modèle, session, options)
   ScreenReaderService.kt  AccessibilityService : capture, app, URL, digest, gestes
   BubbleService.kt        service foreground + overlay WindowManager
+  BootReceiver.kt         relance la bulle après un redémarrage
+  CrashReporter.kt        trace de crash locale uniquement (aucun envoi)
   LobsterBubbleView.kt    badge circulaire animé
   LobsterView.kt          mascotte Canvas (idle / thinking / happy)
   ContextHolder.kt        passage en mémoire entre bulle et chat + snapshot contexte
@@ -203,7 +213,10 @@ Choix assumés :
   copie la capture dans `cacheDir/conversation` pour que l'élagage des captures
   ne casse pas l'historique ; le JSON ne contient que le chemin.
 - **Effacement** : action confirmée dans le menu long-press de la bulle et dans
-  les réglages ; elle vide le JSON, le cache d'images et le fil en mémoire.
+  les réglages ; elle vide le JSON, le cache d'images, le fil en mémoire et,
+  si le panneau est ouvert, l'activité se met à jour immédiatement.
+- **Confidentialité des crashes** : les traces sont écrites dans `filesDir` et
+  restent locales ; l'application ne les envoie jamais au gateway.
 - **Mode contrôle strictement conditionnel** : la liste `tools` est construite à
   chaque requête seulement si `controlMode` est vrai **et** que le service
   d'accessibilité est connecté. Sinon la clé `tools` est absente du JSON.
