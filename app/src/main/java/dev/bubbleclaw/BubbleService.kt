@@ -273,7 +273,8 @@ class BubbleService : Service() {
                 width = 0,
                 height = 0,
                 visibleText = if (AppPrefs.includeVisibleText) reader?.visibleTextDigest() else null,
-                accessibilityMissing = reader == null
+                accessibilityMissing = reader == null,
+                appPackage = reader?.foregroundAppPackage
             )
             capturing = false
             openChat(info)
@@ -285,7 +286,8 @@ class BubbleService : Service() {
                 capturing = false
                 openChat(
                     ScreenContextInfo(
-                        app, page, title, time, null, null, 0, 0, null, false
+                        app, page, title, time, null, null, 0, 0, null, false,
+                        reader.foregroundAppPackage
                     )
                 )
                 return@capture
@@ -309,7 +311,8 @@ class BubbleService : Service() {
                 width = capture.bitmap.width,
                 height = capture.bitmap.height,
                 visibleText = if (AppPrefs.includeVisibleText) reader.visibleTextDigest() else null,
-                accessibilityMissing = false
+                accessibilityMissing = false,
+                appPackage = reader.foregroundAppPackage
             )
             capturing = false
             openChat(info)
