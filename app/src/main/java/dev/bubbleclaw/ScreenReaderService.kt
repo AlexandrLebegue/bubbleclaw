@@ -98,6 +98,9 @@ class ScreenReaderService : AccessibilityService() {
     val foregroundAppPackage: String?
         get() = foregroundPackage
 
+    val currentWindowTitle: String?
+        get() = windowTitle
+
     fun captureScreenshot(callback: (Bitmap?) -> Unit) {
         capture { callback(it?.bitmap) }
     }
