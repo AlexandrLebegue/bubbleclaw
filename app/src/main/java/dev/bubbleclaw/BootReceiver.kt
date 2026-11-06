@@ -12,6 +12,9 @@ class BootReceiver : BroadcastReceiver() {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
         if (!AppPrefs.bubbleEnabled) return
         if (!Settings.canDrawOverlays(context)) return
-        runCatching { BubbleService.start(context) }
+        Diag.log("boot: restarting bubble")
+        if (!BubbleService.start(context)) {
+            Diag.log("boot: foreground service start refused by the system")
+        }
     }
 }

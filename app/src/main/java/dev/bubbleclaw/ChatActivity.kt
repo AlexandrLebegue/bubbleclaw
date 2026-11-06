@@ -77,17 +77,16 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         super.onCreate(savedInstanceState)
         Diag.log("chat activity create")
         setContentView(R.layout.activity_chat)
-        BubbleService.onChatOpened(this)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.setBackgroundDrawable(
-            ColorDrawable(ContextCompat.getColor(this, R.color.ink))
-        )
-        window.setDimAmount(0f)
-        window.setWindowAnimations(0)
-        window.setLayout(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT
-        )
+        runCatching { BubbleService.onChatOpened(this) }
+        runCatching { WindowCompat.setDecorFitsSystemWindows(window, false) }
+            .onFailure { Diag.log("decor fits failed: ${it.javaClass.simpleName}") }
+        runCatching {
+            window.setBackgroundDrawable(
+                ColorDrawable(ContextCompat.getColor(this, R.color.ink))
+            )
+            window.setDimAmount(0f)
+            window.setWindowAnimations(0)
+        }.onFailure { Diag.log("window styling failed: ${it.javaClass.simpleName}") }
 
         root = findViewById(R.id.chat_root)
         panel = findViewById(R.id.chat_panel)
@@ -127,7 +126,11 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
         // Anchor the panel on the same side as the bubble, never flush with the screen edge.
         val bubbleAtBottom = intent.getBooleanExtra(BubbleService.EXTRA_BUBBLE_AT_BOTTOM, false)
-        val panelParams = panel.layoutParams as FrameLayout.LayoutParams
+        val panelParams = panel.layoutParams as? FrameLayout.LayoutParams
+            ?: FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
         panelParams.gravity = if (bubbleAtBottom) {
             Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
         } else {
@@ -140,7 +143,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         panel.layoutParams = panelParams
         panel.setOnClickListener { }
         contextCard.setOnClickListener { showFullScreen(currentImagePath) }
-        BubbleService.sinkBubble()
+        runCatching { BubbleService.sinkBubble() }
 
         root.setOnClickListener { closePanel() }
 
@@ -231,6 +234,10 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private fun closePanel() {
         if (closing) return
         closing = true
+        if (!::panel.isInitialized) {
+            runCatching { finish() }
+            return
+        }
         panel.animate().cancel()
         panel.animate()
             .alpha(0f)
@@ -247,12 +254,17 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     override fun onDestroy() {
         Diag.log("chat activity destroy")
-        BubbleService.onChatClosed(this)
-        BubbleService.restoreBubble()
-        ContextHolder.removeListener(contextListener)
-        shimmer?.stop()
-        mascot.removeCallbacks(happyReset)
-        viewModel.detach(this)
+        runCatching { BubbleService.onChatClosed(this) }
+        runCatching { BubbleService.restoreBubble() }
+        runCatching { ContextHolder.removeListener(contextListener) }
+        runCatching { shimmer?.stop() }
+        runCatching {
+            if (::mascot.isInitialized) {
+                mascot.removeCallbacks(happyReset)
+                mascot.animate().cancel()
+            }
+        }
+        runCatching { if (::viewModel.isInitialized) viewModel.detach(this) }
         super.onDestroy()
     }
 
@@ -673,7 +685,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             )
         )
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        dialog.show()
+        runCatching { dialog.show() }
+            .onFailure { Diag.log("fullscreen dialog failed: ${it.javaClass.simpleName}") }
     }
 
     private fun updatePanelGeometry() {

@@ -54,23 +54,37 @@ class BubbleService : Service() {
         @Volatile
         private var chatActivity: WeakReference<ChatActivity>? = null
 
-        fun start(context: Context) {
+        fun start(context: Context): Boolean {
             val intent = Intent(context, BubbleService::class.java).setAction(ACTION_START)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            return runCatching {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }.onFailure {
+                Diag.log("service start refused: ${it.javaClass.simpleName}")
+            }.isSuccess
         }
 
         fun stop(context: Context) {
-            context.startService(Intent(context, BubbleService::class.java).setAction(ACTION_STOP))
+            val intent = Intent(context, BubbleService::class.java).setAction(ACTION_STOP)
+            runCatching { context.startService(intent) }
+                .onFailure {
+                    Diag.log("service stop fallback: ${it.javaClass.simpleName}")
+                    runCatching { context.stopService(Intent(context, BubbleService::class.java)) }
+                }
         }
 
         fun setState(state: BubbleState) {
             val service = instance ?: return
             Diag.log("state=$state")
-            service.bubbleView?.state = state
+            val apply = { service.bubbleView?.state = state; Unit }
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                runCatching { apply() }
+            } else {
+                service.handler.post { runCatching { apply() } }
+            }
         }
 
         fun isRunning(): Boolean = instance != null
