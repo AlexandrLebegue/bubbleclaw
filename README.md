@@ -7,7 +7,8 @@ contexte de ce que tu regardais, puis discute avec ton agent.
 
 > BubbleClaw est un client personnel pour un gateway auto-hébergé. Il n'y a pas
 > de serveur BubbleClaw, pas de compte, pas de télémétrie. Tout part uniquement
-> vers l'URL que tu configures.
+> vers l'URL que tu configures, y compris les rapports de crash si tu laisses
+> l'option activée.
 
 ## Ce que ça fait
 
@@ -55,6 +56,19 @@ contexte de ce que tu regardais, puis discute avec ton agent.
 - **Copie et lisibilité** : un appui long sur une bulle de message copie son
   contenu. Les messages utilisateur utilisent un texte sombre sur le corail
   pour rester lisibles (contraste renforcé).
+- **Diagnostic sans adb** : un écran `Diagnostic` dans les réglages affiche la
+  dernière trace de crash (horodatage + texte brut sélectionnable), la version
+  de l'app, le modèle Android, l'état de l'accessibilité et de l'overlay, l'URL
+  et le modèle configurés (jamais le jeton), et les 20 dernières lignes du
+  journal interne. Des boutons copient ou partagent la trace et le journal.
+- **Journal interne borné** : `Diag.log(...)` écrit dans `filesDir/diag.log`,
+  plafonné à 200 Ko, les événements clés (démarrage, tap sur la bulle, capture,
+  ouverture/fermeture du panneau, changements d'état, erreurs réseau). Aucun
+  contenu de conversation n'y est enregistré.
+- **Rapports de crash consentis** : `CrashReporter` écrit toujours la trace en
+  local et, si le réglage `Envoyer les rapports de crash` est actif (par
+  défaut), la POSTe vers `{gateway}/chat/completions` avec `user: android:crash`
+  sur un thread limité à 2,5 s. La trace ne part que vers l'URL configurée.
 - **Conversation persistante** : le fil est enregistré dans
   `filesDir/conversation.json` (écriture atomique par fichier temporaire puis
   `rename`), rechargé à chaque ouverture, et survit donc à la fermeture du
@@ -138,6 +152,9 @@ Interrupteurs :
   active au premier message (max 1500 caractères).
 - **Mode contrôle** (off) : autorise les outils d'action sur l'écran.
 - **Réponses en streaming** (on) : désactivable pour forcer le mode non-stream.
+- **Envoyer les rapports de crash** (on) : la trace part uniquement vers l'URL
+  du gateway configuré, jamais ailleurs. Désactivé, seul le fichier local
+  `filesDir/crash-*.txt` est écrit.
 
 **Tester la connexion** fait un `GET /v1/models` et affiche les modèles trouvés,
 ou l'erreur réseau en français.
@@ -152,7 +169,8 @@ ou l'erreur réseau en français.
   moment où tu touches la bulle ou quand un outil `screenshot` est appelé.
 - **Notifications** (Android 13+) : notification du service de premier plan, avec
   une action « Arrêter ».
-- **Internet** : uniquement vers le gateway configuré.
+- **Internet** : uniquement vers le gateway configuré, conversations et rapports
+  de crash consentis inclus.
 - **RECEIVE_BOOT_COMPLETED** : `BootReceiver` relance la bulle au démarrage du
   téléphone si elle était active et si l'autorisation d'overlay est toujours
   accordée.
@@ -170,7 +188,8 @@ app/src/main/java/dev/bubbleclaw/
   ScreenReaderService.kt  AccessibilityService : capture, app, URL, digest, gestes
   BubbleService.kt        service foreground + overlay WindowManager
   BootReceiver.kt         relance la bulle après un redémarrage
-  CrashReporter.kt        trace de crash locale uniquement (aucun envoi)
+  CrashReporter.kt        trace de crash locale + envoi consenti au gateway
+  Diag.kt                 journal interne borné à 200 Ko (sans contenu de chat)
   LobsterBubbleView.kt    badge circulaire animé
   LobsterView.kt          mascotte Canvas (idle / thinking / happy)
   ContextHolder.kt        passage en mémoire entre bulle et chat + snapshot contexte
@@ -187,6 +206,7 @@ app/src/main/java/dev/bubbleclaw/
   Permissions.kt          checklist d'autorisations partagée
   MainActivity.kt         onboarding + accueil
   SettingsActivity.kt     réglages, test gateway, checklist, bulle on/off
+  DiagnosticActivity.kt   trace de crash, état app, journal, copier/partager
 ```
 
 Choix assumés :
@@ -204,7 +224,7 @@ Choix assumés :
   utilise une fenêtre plein écran opaque (pas de translucidité, pas de dim
   système) avec un fond plein écran et un panneau flottant dessinés dans
   l'activité. C'est le
-  choix le plus stable sur Android 12–15 : l'IME reste géré par la fenêtre de
+  choix le plus stable sur Android 12–16 : l'IME reste géré par la fenêtre de
   l'activité (`adjustResize` + insets IME), la rotation et la sauvegarde d'état
   sont natives, et le service ne garde que la bulle.
 - **`ChatViewModel`** garde les messages, le texte en cours de streaming et la
@@ -216,8 +236,10 @@ Choix assumés :
 - **Effacement** : action confirmée dans le menu long-press de la bulle et dans
   les réglages ; elle vide le JSON, le cache d'images, le fil en mémoire et,
   si le panneau est ouvert, l'activité se met à jour immédiatement.
-- **Confidentialité des crashes** : les traces sont écrites dans `filesDir` et
-  restent locales ; l'application ne les envoie jamais au gateway.
+- **Confidentialité des crashes** : les traces sont d'abord écrites dans
+  `filesDir`. L'envoi au gateway est un réglage explicite, actif par défaut,
+  limité à l'URL configurée et à un thread court ; le jeton n'apparaît jamais
+  dans l'écran de diagnostic. Désactivé, rien ne quitte l'appareil.
 - **Mode contrôle strictement conditionnel** : la liste `tools` est construite à
   chaque requête seulement si `controlMode` est vrai **et** que le service
   d'accessibilité est connecté. Sinon la clé `tools` est absente du JSON.
@@ -243,8 +265,10 @@ Choix assumés :
 
 Vérifié ici : compilation `assembleDebug` verte après chaque point, test JVM
 `testDebugUnitTest` vert (markdown : gras, code inline, bloc de code, listes,
-markdown partiel), ressources et manifeste liés, APK produit. Le panneau suit
-les insets IME, la conversation est relue depuis `conversation.json`, les
+markdown partiel), ressources et manifeste liés, APK produit. La version 0.7
+ajoute l'écran de diagnostic, le journal borné et l'envoi de crash consenti.
+Le panneau suit les insets IME, la conversation est relue depuis
+`conversation.json`, les
 animations sont démarrées/arrêtées avec le cycle de vie, et le chat vide affiche
 un accueil court (une phrase + le homard) au lieu d'un écran blanc.
 
@@ -257,11 +281,14 @@ un accueil court (une phrase + le homard) au lieu d'un écran blanc.
 - affichage du menu long-press au-dessus d'autres apps ;
 - streaming SSE réel, gestion des tool calls et des six itérations ;
 - exécution des gestes et du texte dans des champs variés ;
-- comportement des insets sur Android 12 à 15 (panneau, IME, scrim, tap extérieur) ;
+- comportement des insets sur Android 12 à 16 (panneau, IME, scrim, tap extérieur) ;
 - persistance réelle du fil après fermeture, rotation et redémarrage ;
 - animation de réflexion et disparition au premier chunk SSE ;
 - oscillation du homard dans la bulle et pause écran éteint ;
-- autorisation notifications sur Android 13/14/15 ;
+- autorisation notifications sur Android 13/14/15/16 ;
+- ouverture du panneau et démarrage du service au boot sur Android 16 ;
+- réception réelle d'un rapport de crash par le gateway et lecture de l'écran
+  de diagnostic sans adb ;
 - fluidité perçue de l'ouverture (< 150 ms) et du déploiement depuis la bulle ;
 - rendu markdown réel pendant un flux SSE et ouverture des liens.
 
