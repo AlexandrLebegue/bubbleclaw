@@ -47,6 +47,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private lateinit var appIcon: ImageView
     private lateinit var mascotSlot: FrameLayout
     private lateinit var mascot: LobsterView
+    private lateinit var headerDots: BouncingDotsView
 
     private var renderedCount = -1
     private var wasStreaming = false
@@ -54,6 +55,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         if (!viewModel.isStreaming) mascot.mood = LobsterMood.Idle
     }
     private var streamingView: TextView? = null
+    private var thinkingView: ThinkingIndicatorView? = null
     private var contextInfo: ScreenContextInfo? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +85,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         contextThumb = findViewById(R.id.context_thumb)
         appIcon = findViewById(R.id.app_icon)
         mascotSlot = findViewById(R.id.mascot_slot)
+        headerDots = findViewById(R.id.header_dots)
 
         mascot = LobsterView(this)
         mascotSlot.addView(
@@ -288,22 +291,42 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             for (message in messages) addMessageView(message)
             renderedCount = messages.size
             streamingView = null
+            thinkingView = null
         }
 
         if (viewModel.isStreaming) {
-            val text = viewModel.streamingText.ifBlank { "…" }
-            val view = streamingView
-            if (view == null || view.parent == null) {
-                streamingView = addAssistantBubble(text)
+            val text = viewModel.streamingText
+            if (text.isBlank()) {
+                streamingView?.let { view ->
+                    (view.parent as? ViewGroup)?.removeView(view)
+                }
+                streamingView = null
+                if (thinkingView == null) thinkingView = addThinkingBubble()
             } else {
-                view.text = text
+                thinkingView?.let { view ->
+                    (view.parent as? ViewGroup)?.removeView(view)
+                }
+                thinkingView = null
+                val view = streamingView
+                if (view == null || view.parent == null) {
+                    streamingView = addAssistantBubble(text)
+                } else {
+                    view.text = text
+                }
             }
         } else {
             streamingView?.let { view ->
                 (view.parent as? ViewGroup)?.removeView(view)
             }
             streamingView = null
+            thinkingView?.let { view ->
+                (view.parent as? ViewGroup)?.removeView(view)
+            }
+            thinkingView = null
         }
+        headerDots.visibility =
+            if (viewModel.isStreaming && viewModel.streamingText.isBlank()) View.VISIBLE
+            else View.GONE
 
         statusText.text = viewModel.status
         statusText.setTextColor(
@@ -363,7 +386,16 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         container.addView(column)
     }
 
+    private fun addThinkingBubble(): ThinkingIndicatorView {
+        val row = bubbleRow(Gravity.START)
+        val indicator = ThinkingIndicatorView(this)
+        row.addView(indicator)
+        container.addView(row)
+        return indicator
+    }
+
     private fun addMessageView(message: ChatMessage) {
+        if (message.role == "assistant" && isPlaceholder(message.text)) return
         when {
             message.isError -> addErrorView(message.text)
             message.toolCalls.isNotEmpty() -> {
@@ -505,6 +537,11 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         val fixed = headerRow.measuredHeight + contextHeight + inputRow.measuredHeight
         val maxScroll = (maxPanel - fixed).coerceAtLeast(dp(180))
         scroll.maxHeight = maxScroll
+    }
+
+    private fun isPlaceholder(text: String): Boolean {
+        val clean = text.trim()
+        return clean == "…" || clean == "..." || clean.startsWith("Réflexion")
     }
 
     private fun shorten(value: String, max: Int): String =
