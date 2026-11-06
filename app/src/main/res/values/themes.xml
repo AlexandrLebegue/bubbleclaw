@@ -1,14 +1,42 @@
 <resources>
     <style name="Theme.BubbleClaw" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">#FF5A4E</item>
-        <item name="colorSecondary">#FFB4A8</item>
-        <item name="android:statusBarColor">#141013</item>
-        <item name="android:navigationBarColor">#141013</item>
-        <item name="android:windowBackground">#141013</item>
+        <item name="colorPrimary">@color/coral</item>
+        <item name="colorSecondary">@color/coral_light</item>
+        <item name="android:statusBarColor">@color/ink</item>
+        <item name="android:navigationBarColor">@color/ink</item>
+        <item name="android:windowBackground">@color/ink</item>
+        <item name="android:fontFamily">sans</item>
     </style>
+
+    <style name="Theme.BubbleClaw.Chat" parent="Theme.BubbleClaw">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@color/scrim</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+    </style>
+
     <style name="Theme.BubbleClaw.Dialog" parent="Theme.Material3.Dark.Dialog">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="BubbleClaw.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/panel</item>
+        <item name="cardCornerRadius">20dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="contentPadding">16dp</item>
+    </style>
+
+    <style name="BubbleClaw.SectionTitle" parent="">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="BubbleClaw.Body" parent="">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:lineSpacingExtra">3dp</item>
     </style>
 </resources>

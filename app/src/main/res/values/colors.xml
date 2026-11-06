@@ -1,0 +1,13 @@
+<resources>
+    <color name="coral">#FF5A4E</color>
+    <color name="coral_light">#FF8A7A</color>
+    <color name="coral_dark">#C73F36</color>
+    <color name="ink">#141013</color>
+    <color name="panel">#1E191D</color>
+    <color name="panel_high">#2A2329</color>
+    <color name="text_primary">#F7EFEF</color>
+    <color name="text_secondary">#B9AEB2</color>
+    <color name="danger">#FF6B6B</color>
+    <color name="success">#69D98B</color>
+    <color name="scrim">#CC0E0B10</color>
+</resources>

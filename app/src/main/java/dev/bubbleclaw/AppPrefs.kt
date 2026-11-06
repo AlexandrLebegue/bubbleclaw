@@ -1,0 +1,64 @@
+package dev.bubbleclaw
+
+import android.content.Context
+import android.content.SharedPreferences
+
+/**
+ * Single source of truth for persisted configuration.
+ * Defaults match the contract: a local OpenClaw gateway, no control mode.
+ */
+object AppPrefs {
+    private const val FILE = "bubbleclaw"
+
+    private lateinit var prefs: SharedPreferences
+
+    fun init(context: Context) {
+        if (!::prefs.isInitialized) {
+            prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        }
+    }
+
+    var baseUrl: String
+        get() = prefs.getString("baseUrl", "http://192.168.1.57:18789/v1")!!
+        set(value) = prefs.edit().putString("baseUrl", value.trim()).apply()
+
+    var token: String
+        get() = prefs.getString("token", "")!!
+        set(value) = prefs.edit().putString("token", value.trim()).apply()
+
+    var model: String
+        get() = prefs.getString("model", "openclaw/boss")!!
+        set(value) = prefs.edit().putString("model", value.trim()).apply()
+
+    var sessionId: String
+        get() = prefs.getString("sessionId", "android:bubbleclaw")!!
+        set(value) = prefs.edit().putString("sessionId", value.trim()).apply()
+
+    var autoScreenshot: Boolean
+        get() = prefs.getBoolean("autoScreenshot", true)
+        set(value) = prefs.edit().putBoolean("autoScreenshot", value).apply()
+
+    var includeVisibleText: Boolean
+        get() = prefs.getBoolean("includeVisibleText", false)
+        set(value) = prefs.edit().putBoolean("includeVisibleText", value).apply()
+
+    var controlMode: Boolean
+        get() = prefs.getBoolean("controlMode", false)
+        set(value) = prefs.edit().putBoolean("controlMode", value).apply()
+
+    var bubbleEnabled: Boolean
+        get() = prefs.getBoolean("bubbleEnabled", true)
+        set(value) = prefs.edit().putBoolean("bubbleEnabled", value).apply()
+
+    var streamEnabled: Boolean
+        get() = prefs.getBoolean("streamEnabled", true)
+        set(value) = prefs.edit().putBoolean("streamEnabled", value).apply()
+
+    var bubbleY: Int
+        get() = prefs.getInt("bubbleY", -1)
+        set(value) = prefs.edit().putInt("bubbleY", value).apply()
+
+    var onboardingDone: Boolean
+        get() = prefs.getBoolean("onboardingDone", false)
+        set(value) = prefs.edit().putBoolean("onboardingDone", value).apply()
+}
