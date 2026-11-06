@@ -42,7 +42,6 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private lateinit var sendButton: ImageButton
     private lateinit var contextApp: TextView
     private lateinit var contextPage: TextView
-    private lateinit var contextTime: TextView
     private lateinit var contextThumb: ImageView
     private lateinit var appIcon: ImageView
     private lateinit var mascotSlot: FrameLayout
@@ -57,6 +56,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private var streamingView: TextView? = null
     private var thinkingView: ThinkingIndicatorView? = null
     private var contextInfo: ScreenContextInfo? = null
+    private var currentImagePath: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,7 +81,6 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         sendButton = findViewById(R.id.send_button)
         contextApp = findViewById(R.id.context_app)
         contextPage = findViewById(R.id.context_page)
-        contextTime = findViewById(R.id.context_time)
         contextThumb = findViewById(R.id.context_thumb)
         appIcon = findViewById(R.id.app_icon)
         mascotSlot = findViewById(R.id.mascot_slot)
@@ -96,15 +95,21 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             )
         )
 
+        // Anchor the panel on the same side as the bubble, never flush with the screen edge.
         val bubbleAtBottom = intent.getBooleanExtra(BubbleService.EXTRA_BUBBLE_AT_BOTTOM, false)
         val panelParams = panel.layoutParams as FrameLayout.LayoutParams
         panelParams.gravity = if (bubbleAtBottom) {
-            Gravity.TOP or Gravity.CENTER_HORIZONTAL
-        } else {
             Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        } else {
+            Gravity.TOP or Gravity.CENTER_HORIZONTAL
         }
+        panelParams.topMargin = dp(if (bubbleAtBottom) 16 else 24)
+        panelParams.bottomMargin = dp(if (bubbleAtBottom) 24 else 16)
+        panelParams.leftMargin = dp(16)
+        panelParams.rightMargin = dp(16)
         panel.layoutParams = panelParams
         panel.setOnClickListener { }
+        contextCard.setOnClickListener { showFullScreen(currentImagePath) }
 
         root.setOnClickListener { finish() }
 
@@ -178,9 +183,9 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         if (info == null) {
             contextApp.text = "Contexte indisponible"
             contextPage.text = "Ouvre la discussion depuis la bulle pour capturer l'écran."
-            contextTime.text = ""
             contextThumb.visibility = View.GONE
             appIcon.setImageResource(R.drawable.ic_launcher)
+            currentImagePath = null
             return
         }
         contextApp.text = info.appName?.takeIf { it.isNotBlank() } ?: "Application inconnue"
@@ -190,8 +195,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
                 ?: info.windowTitle?.takeIf { it.isNotBlank() }
                 ?: "Fenêtre active"
         }
-        val dimensions = if (info.width > 0 && info.height > 0) " · ${info.width}×${info.height}" else ""
-        contextTime.text = "Capture à ${info.time}$dimensions"
+        currentImagePath = info.imagePath ?: info.thumbPath
 
         val packageName = info.appPackage
         if (!packageName.isNullOrBlank()) {
@@ -207,8 +211,6 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         if (thumb != null) {
             contextThumb.visibility = View.VISIBLE
             contextThumb.setImageBitmap(thumb)
-            val full = info.imagePath ?: thumbPath
-            contextThumb.setOnClickListener { showFullScreen(full) }
         } else {
             contextThumb.visibility = View.GONE
         }
@@ -350,7 +352,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             mascot.mood = LobsterMood.Idle
         }
 
-        scrollToBottom()
+        adjustScroll()
     }
 
     private fun addEmptyState() {
@@ -499,8 +501,15 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private fun maxBubbleWidth(): Int =
         (resources.displayMetrics.widthPixels * 0.82f).toInt()
 
-    private fun scrollToBottom() {
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    private fun adjustScroll() {
+        scroll.post {
+            val content = scroll.getChildAt(0) ?: return@post
+            if (content.height <= scroll.height) {
+                scroll.scrollTo(0, 0)
+            } else {
+                scroll.fullScroll(View.FOCUS_DOWN)
+            }
+        }
     }
 
     private fun showFullScreen(path: String?) {
@@ -532,10 +541,10 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         }
         val available = root.height - root.paddingTop - root.paddingBottom
         if (available <= 0) return
-        val maxPanel = (available * 0.62f).toInt()
+        val maxPanel = (available * 0.52f).toInt()
         val contextHeight = if (contextCard.visibility == View.VISIBLE) contextCard.measuredHeight else 0
         val fixed = headerRow.measuredHeight + contextHeight + inputRow.measuredHeight
-        val maxScroll = (maxPanel - fixed).coerceAtLeast(dp(180))
+        val maxScroll = (maxPanel - fixed).coerceAtLeast(dp(120))
         scroll.maxHeight = maxScroll
     }
 
