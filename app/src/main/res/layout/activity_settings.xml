@@ -168,6 +168,21 @@
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
 
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switch_crash_reports"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_crash_reports"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/BubbleClaw.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="@string/settings_crash_reports_body" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/clear_chat_button"
             android:layout_width="match_parent"

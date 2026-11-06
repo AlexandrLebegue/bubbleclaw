@@ -56,6 +56,8 @@
     <string name="settings_include_text">Inclure le texte visible dans le contexte</string>
     <string name="settings_control">Mode contrôle (l\'agent peut agir)</string>
     <string name="settings_stream">Réponses en streaming</string>
+    <string name="settings_crash_reports">Envoyer les rapports de crash</string>
+    <string name="settings_crash_reports_body">La trace part uniquement vers l\'URL du gateway configuré, jamais ailleurs. Si tu désactives ce réglage, seul le fichier local est écrit.</string>
     <string name="settings_saved">Réglages enregistrés</string>
 
     <string name="main_tagline">Ton homard, par-dessus toutes tes apps.</string>
