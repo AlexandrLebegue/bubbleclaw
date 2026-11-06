@@ -91,13 +91,15 @@ class BubbleService : Service() {
 
         fun onChatOpened(activity: ChatActivity) {
             chatActivity = WeakReference(activity)
+            instance?.ensureChatBubblePosition()
             instance?.bubbleView?.contentDescription =
                 instance?.getString(R.string.bubble_description_close)
         }
 
-        fun onChatClosed(activity: ChatActivity) {
+        fun onChatClosed(activity: ChatActivity, keepPendingCapture: Boolean = false) {
             if (chatActivity?.get() === activity) {
                 chatActivity = null
+                if (!keepPendingCapture) instance?.cancelPendingCapture()
                 instance?.bubbleView?.contentDescription =
                     instance?.getString(R.string.bubble_description_open)
             }
@@ -124,8 +126,9 @@ class BubbleService : Service() {
             instance?.animateBubbleSink()
         }
 
-        fun restoreBubble() {
+        fun restoreBubble(restorePosition: Boolean = true) {
             instance?.animateBubbleRestore()
+            if (restorePosition) instance?.restoreChatBubblePosition()
         }
     }
 
@@ -134,6 +137,7 @@ class BubbleService : Service() {
     private var params: WindowManager.LayoutParams? = null
     private val handler = Handler(Looper.getMainLooper())
     private var snapAnimator: android.animation.ValueAnimator? = null
+    private var moveAnimator: android.animation.ValueAnimator? = null
 
     private var downRawX = 0f
     private var downRawY = 0f
@@ -141,7 +145,17 @@ class BubbleService : Service() {
     private var startY = 0
     private var dragging = false
     private var longPressFired = false
+
+    @Volatile
     private var capturing = false
+
+    private var captureGeneration = 0
+    private var captureTimeout: Runnable? = null
+
+    private var movedForChat = false
+    private var movedByUserSinceCenter = false
+    private var preChatX = -1
+    private var preChatY = -1
 
     private val longPressRunnable = Runnable {
         if (!dragging) {
@@ -199,14 +213,20 @@ class BubbleService : Service() {
         val size = dp(64)
         val width = resources.displayMetrics.widthPixels
         val height = resources.displayMetrics.heightPixels
-        layout.x = if (AppPrefs.bubbleOnLeft) 0 else (width - size).coerceAtLeast(0)
-        clampY(layout, height)
+        if (movedForChat) {
+            layout.x = ((width - size) / 2).coerceAtLeast(0)
+            layout.y = topBubbleY()
+        } else {
+            layout.x = if (AppPrefs.bubbleOnLeft) 0 else (width - size).coerceAtLeast(0)
+            clampY(layout, height)
+        }
         updateLayout(layout)
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         snapAnimator?.cancel()
+        moveAnimator?.cancel()
         bubbleView?.let { view ->
             runCatching { windowManager?.removeView(view) }
         }
@@ -304,6 +324,8 @@ class BubbleService : Service() {
                 if (!dragging && hypot(dx.toDouble(), dy.toDouble()) > dp(8).toDouble()) {
                     dragging = true
                     handler.removeCallbacks(longPressRunnable)
+                    moveAnimator?.cancel()
+                    if (movedForChat) movedByUserSinceCenter = true
                 }
                 if (dragging) {
                     layout.x = (startX + dx).toInt()
@@ -354,16 +376,20 @@ class BubbleService : Service() {
     }
 
     private fun onBubbleTap() {
-        if (capturing) return
         Diag.log("bubble tap")
+        bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+        bubbleView?.playTapReaction()
         if (isChatOpen()) {
-            bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+            cancelPendingCapture()
             closeChat()
             return
         }
+        if (capturing) return
         capturing = true
-        bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+        val generation = ++captureGeneration
         animateBubbleSink()
+        ensureChatBubblePosition()
+        armCaptureTimeout()
         val reader = ScreenReaderService.instance
         val app = reader?.foregroundAppName
         val page = reader?.currentPageUrl()
@@ -387,6 +413,7 @@ class BubbleService : Service() {
                 appPackage = pkg
             )
             capturing = false
+            clearCaptureTimeout()
             openChat(info)
             return
         }
@@ -411,19 +438,24 @@ class BubbleService : Service() {
         )
 
         reader.capture { capture ->
+            if (generation != captureGeneration) return@capture
+            clearCaptureTimeout()
             if (capture == null) {
                 Diag.log("capture failed")
                 capturing = false
                 handler.post {
-                    ContextHolder.put(
-                        ScreenContextInfo(
-                            app, page, title, time, null, null, 0, 0, null, false, pkg
+                    if (generation == captureGeneration) {
+                        ContextHolder.put(
+                            ScreenContextInfo(
+                                app, page, title, time, null, null, 0, 0, null, false, pkg
+                            )
                         )
-                    )
+                    }
                 }
                 return@capture
             }
             Diag.log("capture ok ${capture.bitmap.width}x${capture.bitmap.height}")
+            capturing = false
             val directory = File(cacheDir, "captures").apply { mkdirs() }
             val stamp = System.currentTimeMillis()
             val imageFile = File(directory, "capture_$stamp.jpg")
@@ -438,6 +470,7 @@ class BubbleService : Service() {
             val width = capture.bitmap.width
             val height = capture.bitmap.height
             handler.post {
+                if (generation != captureGeneration) return@post
                 val info = ScreenContextInfo(
                     appName = app,
                     page = page,
@@ -451,10 +484,104 @@ class BubbleService : Service() {
                     accessibilityMissing = false,
                     appPackage = pkg
                 )
-                capturing = false
                 ContextHolder.put(info)
             }
         }
+    }
+
+    private fun armCaptureTimeout() {
+        clearCaptureTimeout()
+        val timeout = Runnable {
+            if (capturing) {
+                Diag.log("capture timeout")
+                capturing = false
+            }
+        }
+        captureTimeout = timeout
+        handler.postDelayed(timeout, 3000)
+    }
+
+    private fun clearCaptureTimeout() {
+        captureTimeout?.let { handler.removeCallbacks(it) }
+        captureTimeout = null
+    }
+
+    private fun cancelPendingCapture() {
+        captureGeneration++
+        capturing = false
+        clearCaptureTimeout()
+    }
+
+    private fun ensureChatBubblePosition() {
+        val layout = params ?: return
+        if (movedForChat) return
+        preChatX = layout.x
+        preChatY = layout.y
+        movedForChat = true
+        movedByUserSinceCenter = false
+        val size = dp(64)
+        val width = resources.displayMetrics.widthPixels
+        val targetX = ((width - size) / 2).coerceAtLeast(0)
+        animateBubbleTo(layout, targetX, topBubbleY(), 220)
+    }
+
+    private fun restoreChatBubblePosition() {
+        if (!movedForChat) return
+        val layout = params ?: run {
+            movedForChat = false
+            return
+        }
+        movedForChat = false
+        val width = resources.displayMetrics.widthPixels
+        val height = resources.displayMetrics.heightPixels
+        val size = dp(64)
+        if (movedByUserSinceCenter || preChatX < 0) {
+            movedByUserSinceCenter = false
+            snapToEdge(layout, width, height)
+            return
+        }
+        val targetX = preChatX.coerceIn(0, (width - size).coerceAtLeast(0))
+        val targetY = preChatY.coerceIn(dp(24), (height - size - dp(24)).coerceAtLeast(dp(24)))
+        animateBubbleTo(layout, targetX, targetY, 180)
+    }
+
+    private fun animateBubbleTo(
+        layout: WindowManager.LayoutParams,
+        targetX: Int,
+        targetY: Int,
+        duration: Int
+    ) {
+        snapAnimator?.cancel()
+        moveAnimator?.cancel()
+        val startX = layout.x
+        val startY = layout.y
+        if (startX == targetX && startY == targetY) return
+        moveAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            this.duration = duration.toLong()
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener {
+                val progress = it.animatedValue as Float
+                layout.x = (startX + (targetX - startX) * progress).toInt()
+                layout.y = (startY + (targetY - startY) * progress).toInt()
+                updateLayout(layout)
+            }
+            start()
+        }
+    }
+
+    private fun topBubbleY(): Int {
+        val inset = runCatching {
+            bubbleView?.rootWindowInsets
+                ?.getInsets(android.view.WindowInsets.Type.statusBars())
+                ?.top
+        }.getOrNull() ?: 0
+        val statusBar = if (inset > 0) {
+            inset
+        } else {
+            val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+            if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
+        }
+        return statusBar + dp(8)
     }
 
     private fun jpegOf(bitmap: android.graphics.Bitmap): ByteArray {
@@ -478,14 +605,23 @@ class BubbleService : Service() {
         bubbleView?.state = BubbleState.Idle
         val screenHeight = resources.displayMetrics.heightPixels
         val size = dp(64)
-        val bubbleCenterX = (params?.x ?: 0) + size / 2
-        val bubbleCenterY = (params?.y ?: 0) + size / 2
+        val bubbleCenterX = if (movedForChat) {
+            resources.displayMetrics.widthPixels / 2
+        } else {
+            (params?.x ?: 0) + size / 2
+        }
+        val bubbleCenterY = if (movedForChat) {
+            topBubbleY() + size / 2
+        } else {
+            (params?.y ?: 0) + size / 2
+        }
+        val bubbleAtBottom = !movedForChat && bubbleCenterY > screenHeight / 2
         val intent = Intent(this, ChatActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(EXTRA_IMAGE_PATH, info.imagePath)
             putExtra(EXTRA_THUMB_PATH, info.thumbPath)
             putExtra(EXTRA_CONTEXT, info.summary())
-            putExtra(EXTRA_BUBBLE_AT_BOTTOM, bubbleCenterY > screenHeight / 2)
+            putExtra(EXTRA_BUBBLE_AT_BOTTOM, bubbleAtBottom)
             putExtra(EXTRA_BUBBLE_X, bubbleCenterX)
             putExtra(EXTRA_BUBBLE_Y, bubbleCenterY)
         }

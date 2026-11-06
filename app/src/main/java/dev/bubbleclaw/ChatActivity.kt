@@ -81,9 +81,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         runCatching { WindowCompat.setDecorFitsSystemWindows(window, false) }
             .onFailure { Diag.log("decor fits failed: ${it.javaClass.simpleName}") }
         runCatching {
-            window.setBackgroundDrawable(
-                ColorDrawable(ContextCompat.getColor(this, R.color.ink))
-            )
+            window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             window.setDimAmount(0f)
             window.setWindowAnimations(0)
         }.onFailure { Diag.log("window styling failed: ${it.javaClass.simpleName}") }
@@ -136,7 +135,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         } else {
             Gravity.TOP or Gravity.CENTER_HORIZONTAL
         }
-        panelParams.topMargin = dp(if (bubbleAtBottom) 16 else 24)
+        // The bubble parks at the top center while the panel is open, so leave room for it.
+        panelParams.topMargin = dp(if (bubbleAtBottom) 16 else 88)
         panelParams.bottomMargin = dp(if (bubbleAtBottom) 24 else 16)
         panelParams.leftMargin = dp(16)
         panelParams.rightMargin = dp(16)
@@ -254,8 +254,9 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     override fun onDestroy() {
         Diag.log("chat activity destroy")
-        runCatching { BubbleService.onChatClosed(this) }
-        runCatching { BubbleService.restoreBubble() }
+        val rotating = isChangingConfigurations
+        runCatching { BubbleService.onChatClosed(this, keepPendingCapture = rotating) }
+        runCatching { BubbleService.restoreBubble(restorePosition = !rotating) }
         runCatching { ContextHolder.removeListener(contextListener) }
         runCatching { shimmer?.stop() }
         runCatching {

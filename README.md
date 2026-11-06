@@ -23,13 +23,12 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   quand l'app est un navigateur connu, titre de fenêtre sinon, texte visible en
   option. La carte de contexte est une seule ligne compacte : icône de l'app,
   nom, page et vignette 36 dp. Toute la ligne ouvre la capture en plein écran.
-- **Panneau de discussion flottant** : une fenêtre compacte (largeur 92 % de
-  l'écran plafonnée à 420 dp, hauteur maximale 52 % de la zone utile), coins
-  arrondis 24 dp, bordure corail, ombre, sur un fond opaque `#F2141013` : aucune
-  transparence, aucun aperçu de l'application précédente. Marge de 16 dp sur
-  les côtés et 24 dp au-dessus de la barre de navigation. Le panneau est ancré
-  du même côté que la bulle (en haut à 24 dp sous la barre d'état, ou en bas).
-  Un tap hors du panneau le ferme.
+- **Panneau de discussion flottant** : la fenêtre de chat est translucide et
+  laisse voir l'application courante ; seule la carte du panneau est opaque
+  (`#FF1B1518`, largeur 92 % plafonnée à 420 dp, hauteur maximale 52 % de la
+  zone utile, coins arrondis 24 dp, bordure corail, ombre). Marge de 16 dp sur
+  les côtés. À l'ouverture, la bulle se déplace en haut au centre et le panneau
+  s'ouvre juste en dessous. Un tap hors du panneau le ferme.
 - **Ouverture immédiate** : le panneau s'affiche au tap avec un squelette
   « Capture de l'écran… » et un shimmer, puis la carte se remplit quand la
   capture est prête, sans relancer l'activité. Le décodage, le redimensionnement
@@ -40,15 +39,17 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   messages de l'assistant sont rendus en `Spannable` par un parser et un
   renderer maison, tolérants au markdown partiel du streaming ; les messages
   utilisateur restent en texte simple.
-- **Animation d'ouverture** : la bulle s'enfonce (0.86, 90 ms), pause de 60 ms,
-  puis le panneau se déploie depuis le centre de la bulle (0.85 → 1.0, fondu
-  180 ms). La fermeture inverse dure 140 ms puis la bulle remonte. Retour
-  haptique léger au tap.
+- **Animation d'ouverture** : la bulle s'enfonce (0.86, 90 ms), glisse en haut
+  au centre du téléphone (220 ms), puis le panneau se déploie depuis le centre
+  de la bulle (0.85 → 1.0, fondu 180 ms). À chaque tap, le homard plisse les
+  yeux et lève ses pinces pendant 460 ms. La fermeture inverse dure 140 ms puis
+  la bulle remonte et retrouve sa position précédente. Retour haptique léger.
 - **Second tap sur la bulle** : si la discussion est déjà ouverte, le même tap
   joue l'animation inverse et ferme le panneau, sans nouvelle capture ni
-  réouverture. L'état est tenu par `BubbleService`, renseigné par `ChatActivity`
-  à la création et libéré à la destruction (rotation, retour arrière, fermeture
-  par tap extérieur), donc une activité morte ne bloque jamais la bulle.
+  réouverture, même si une capture est encore en cours (elle est annulée). L'état
+  est tenu par `BubbleService`, renseigné par `ChatActivity` à la création et
+  libéré à la destruction (rotation, retour arrière, fermeture par tap
+  extérieur), donc une activité morte ne bloque jamais la bulle.
 - **Chat en streaming SSE** vers `chat/completions`, avec repli automatique en
   non-streaming, messages d'erreur en français et bouton « Réessayer ». Pendant
   une réponse, le bouton d'envoi devient « Annuler la réponse » : il coupe la
@@ -221,12 +222,12 @@ Choix assumés :
   Binder), et le `ContextHolder` sert de raccourci en mémoire. Le cache est
   élagué aux 20 captures les plus récentes.
 - **Panneau flottant plutôt qu'overlay dans le service** : `ChatActivity`
-  utilise une fenêtre plein écran opaque (pas de translucidité, pas de dim
-  système) avec un fond plein écran et un panneau flottant dessinés dans
-  l'activité. C'est le
-  choix le plus stable sur Android 12–16 : l'IME reste géré par la fenêtre de
-  l'activité (`adjustResize` + insets IME), la rotation et la sauvegarde d'état
-  sont natives, et le service ne garde que la bulle.
+  utilise une fenêtre plein écran translucide, sans dim système ni fond opaque,
+  avec un panneau flottant dessiné dans l'activité. C'est le choix le plus
+  stable sur Android 12–16 : l'application courante reste visible autour du
+  panneau, l'IME reste géré par la fenêtre de l'activité (`adjustResize` +
+  insets IME), la rotation et la sauvegarde d'état sont natives, et le service
+  ne garde que la bulle.
 - **`ChatViewModel`** garde les messages, le texte en cours de streaming et la
   boucle d'outils ; `ConversationStore` écrit chaque ajout dans un fichier
   temporaire puis le renomme. L'activité ne fait que rendre l'état.
@@ -284,6 +285,8 @@ un accueil court (une phrase + le homard) au lieu d'un écran blanc.
 - comportement des insets sur Android 12 à 16 (panneau, IME, scrim, tap extérieur) ;
 - persistance réelle du fil après fermeture, rotation et redémarrage ;
 - animation de réflexion et disparition au premier chunk SSE ;
+- déplacement de la bulle en haut au centre, réaction yeux plissés/pinces levées,
+  fermeture au second tap même pendant une capture ;
 - oscillation du homard dans la bulle et pause écran éteint ;
 - autorisation notifications sur Android 13/14/15/16 ;
 - ouverture du panneau et démarrage du service au boot sur Android 16 ;

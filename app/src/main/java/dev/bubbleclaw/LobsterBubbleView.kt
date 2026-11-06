@@ -1,5 +1,7 @@
 package dev.bubbleclaw
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -70,6 +72,12 @@ class LobsterBubbleView @JvmOverloads constructor(
         strokeWidth = dp(1.2f)
         color = Color.parseColor("#55FFE3DA")
     }
+    private val squintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(2.6f)
+        strokeCap = Paint.Cap.ROUND
+        color = Color.parseColor("#241A1E")
+    }
 
     private val smilePath = Path()
     private val antennaLeft = Path()
@@ -83,6 +91,7 @@ class LobsterBubbleView @JvmOverloads constructor(
     private var eyeRadius = 0f
     private var phase = 0f
     private var floatPhase = 0f
+    private var reaction = 0f
     private var screenOn = true
 
     private val pulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -105,6 +114,28 @@ class LobsterBubbleView @JvmOverloads constructor(
             floatPhase = it.animatedValue as Float
             invalidate()
         }
+    }
+
+    private val reactionAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 460
+        interpolator = LinearInterpolator()
+        addUpdateListener {
+            reaction = it.animatedValue as Float
+            invalidate()
+        }
+        addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                reaction = 0f
+                invalidate()
+            }
+        })
+    }
+
+    /** Short tap reaction: squinted eyes and claws raised upward. */
+    fun playTapReaction() {
+        if (!isAttachedToWindow) return
+        reactionAnimator.cancel()
+        reactionAnimator.start()
     }
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -162,6 +193,7 @@ class LobsterBubbleView @JvmOverloads constructor(
         runCatching { context.unregisterReceiver(screenReceiver) }
         pulseAnimator.cancel()
         floatAnimator.cancel()
+        reactionAnimator.cancel()
         super.onDetachedFromWindow()
     }
 
@@ -189,6 +221,7 @@ class LobsterBubbleView @JvmOverloads constructor(
         if (!attached || !screenOn) {
             pulseAnimator.cancel()
             floatAnimator.cancel()
+            reactionAnimator.cancel()
             return
         }
         val duration = if (state == BubbleState.Thinking) 1800L else 3600L
@@ -221,13 +254,28 @@ class LobsterBubbleView @JvmOverloads constructor(
         val amplitude = dp(if (state == BubbleState.Thinking) 5f else 3f)
         val bob = wave * amplitude
         val rotation = -wave * 1.5f
+        val lift = sin(reaction * Math.PI).toFloat().coerceIn(0f, 1f)
 
         canvas.save()
-        canvas.translate(0f, bob)
+        canvas.translate(0f, bob - bodyRadius * 0.18f * lift)
         canvas.rotate(rotation, cx, cy)
 
-        canvas.drawPath(clawLeft, highlightPaint)
-        canvas.drawPath(clawRight, highlightPaint)
+        if (lift > 0.01f) {
+            canvas.save()
+            canvas.translate(-bodyRadius * 0.05f * lift, -bodyRadius * 0.62f * lift)
+            canvas.rotate(-22f * lift, cx - bodyRadius * 0.72f, cy + bodyRadius * 0.30f)
+            canvas.drawPath(clawLeft, highlightPaint)
+            canvas.restore()
+
+            canvas.save()
+            canvas.translate(bodyRadius * 0.05f * lift, -bodyRadius * 0.62f * lift)
+            canvas.rotate(22f * lift, cx + bodyRadius * 0.72f, cy + bodyRadius * 0.30f)
+            canvas.drawPath(clawRight, highlightPaint)
+            canvas.restore()
+        } else {
+            canvas.drawPath(clawLeft, highlightPaint)
+            canvas.drawPath(clawRight, highlightPaint)
+        }
 
         canvas.drawPath(antennaLeft, linePaint)
         canvas.drawPath(antennaRight, linePaint)
@@ -239,18 +287,24 @@ class LobsterBubbleView @JvmOverloads constructor(
         val eyeOffset = bodyRadius * 0.36f
         val leftX = cx - eyeOffset
         val rightX = cx + eyeOffset
-        canvas.drawCircle(leftX, eyeY, eyeRadius, eyePaint)
-        canvas.drawCircle(rightX, eyeY, eyeRadius, eyePaint)
+        if (lift > 0.18f) {
+            val half = eyeRadius * 0.92f
+            canvas.drawLine(leftX - half, eyeY, leftX + half, eyeY, squintPaint)
+            canvas.drawLine(rightX - half, eyeY, rightX + half, eyeY, squintPaint)
+        } else {
+            canvas.drawCircle(leftX, eyeY, eyeRadius, eyePaint)
+            canvas.drawCircle(rightX, eyeY, eyeRadius, eyePaint)
 
-        val pupilOffset = eyeRadius * 0.22f
-        val pupilY = eyeY + eyeRadius * 0.10f
-        val pupilR = eyeRadius * 0.52f
-        canvas.drawCircle(leftX + pupilOffset, pupilY, pupilR, pupilPaint)
-        canvas.drawCircle(rightX + pupilOffset, pupilY, pupilR, pupilPaint)
+            val pupilOffset = eyeRadius * 0.22f
+            val pupilY = eyeY + eyeRadius * 0.10f
+            val pupilR = eyeRadius * 0.52f
+            canvas.drawCircle(leftX + pupilOffset, pupilY, pupilR, pupilPaint)
+            canvas.drawCircle(rightX + pupilOffset, pupilY, pupilR, pupilPaint)
 
-        val glintR = eyeRadius * 0.18f
-        canvas.drawCircle(leftX + pupilOffset - pupilR * 0.35f, pupilY - pupilR * 0.4f, glintR, glintPaint)
-        canvas.drawCircle(rightX + pupilOffset - pupilR * 0.35f, pupilY - pupilR * 0.4f, glintR, glintPaint)
+            val glintR = eyeRadius * 0.18f
+            canvas.drawCircle(leftX + pupilOffset - pupilR * 0.35f, pupilY - pupilR * 0.4f, glintR, glintPaint)
+            canvas.drawCircle(rightX + pupilOffset - pupilR * 0.35f, pupilY - pupilR * 0.4f, glintR, glintPaint)
+        }
 
         canvas.drawPath(smilePath, linePaint)
 
