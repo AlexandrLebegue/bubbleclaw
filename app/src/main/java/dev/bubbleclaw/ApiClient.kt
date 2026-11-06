@@ -24,6 +24,7 @@ class ApiClient(
     private val streamEnabled: Boolean = true
 ) {
     private val root = baseUrl.trim().trimEnd('/')
+    private val apiRoot = if (root.endsWith("/v1")) root else "$root/v1"
 
     companion object {
         const val UNREACHABLE =
@@ -47,10 +48,13 @@ class ApiClient(
         if (streamEnabled) {
             var emitted = false
             try {
-                return streamCompletion(messages, tools) { piece ->
+                val result = streamCompletion(messages, tools) { piece ->
                     emitted = true
                     onDelta(piece)
                 }
+                val empty = result.content.isBlank() && result.toolCalls.isEmpty() && result.finishReason == null
+                if (!emitted && empty) return completion(messages, tools)
+                return result
             } catch (e: ApiException) {
                 if (!emitted) return completion(messages, tools)
                 throw e
@@ -60,7 +64,7 @@ class ApiClient(
     }
 
     fun listModels(): List<String> {
-        val connection = open("GET", "$root/models", accept = "application/json", timeoutMs = 12_000)
+        val connection = open("GET", "$apiRoot/models", accept = "application/json", timeoutMs = 12_000)
         return try {
             val code = connection.responseCode
             if (code !in 200..299) throw ApiException(httpError(code, readBody(connection.errorStream)))
@@ -86,7 +90,7 @@ class ApiClient(
         tools: JSONArray?,
         onDelta: (String) -> Unit
     ): TurnResult {
-        val connection = open("POST", "$root/chat/completions", accept = "text/event-stream")
+        val connection = open("POST", "$apiRoot/chat/completions", accept = "text/event-stream")
         try {
             val payload = buildPayload(messages, tools, stream = true)
             write(connection, payload)
@@ -137,7 +141,7 @@ class ApiClient(
     }
 
     private fun completion(messages: JSONArray, tools: JSONArray?): TurnResult {
-        val connection = open("POST", "$root/chat/completions", accept = "application/json")
+        val connection = open("POST", "$apiRoot/chat/completions", accept = "application/json")
         try {
             write(connection, buildPayload(messages, tools, stream = false))
             val code = connection.responseCode

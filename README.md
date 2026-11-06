@@ -1,0 +1,186 @@
+# BubbleClaw
+
+Bulle de chat flottante pour Android, connectée à **ton propre gateway OpenClaw**
+(API HTTP compatible OpenAI). Un homard un peu trop mignon vit par-dessus toutes
+tes applications : tu le touches, il photographie l'écran, ouvre le chat avec le
+contexte de ce que tu regardais, puis discute avec ton agent.
+
+> BubbleClaw est un client personnel pour un gateway auto-hébergé. Il n'y a pas
+> de serveur BubbleClaw, pas de compte, pas de télémétrie. Tout part uniquement
+> vers l'URL que tu configures.
+
+## Ce que ça fait
+
+- **Bulle persistante** (`BubbleService`) en service de premier plan, draggable,
+  qui se colle au bord le plus proche et mémorise sa position verticale.
+- **Capture d'écran sans popup MediaProjection** via l'API Accessibility
+  (`takeScreenshot`, Android 11+), image réduite à 1080 px de large, JPEG q70,
+  plus une vignette 320 px.
+- **Contexte automatique** : nom de l'application au premier plan, URL de la page
+  quand l'app est un navigateur connu, titre de fenêtre sinon, texte visible en
+  option. La carte de contexte du chat affiche l'icône de l'app, la page, l'heure
+  et la vignette (toucher la vignette = plein écran).
+- **Chat en streaming SSE** vers `chat/completions`, avec repli automatique en
+  non-streaming, messages d'erreur en français et bouton « Réessayer ».
+- **Session stable** : le même identifiant de session est réutilisé d'un
+  lancement à l'autre, donc la conversation continue côté gateway.
+- **Mode contrôle** (désactivé par défaut) : l'agent peut appeler des outils
+  locaux (`tap`, `swipe`, `scroll`, `type_text`, `press_key`, `open_app`,
+  `screenshot`). Les coordonnées sont exprimées dans celles de la capture, puis
+  converties en pixels écran. Six allers-retours d'outils maximum par question.
+  Quand le mode est off, **aucun** tableau `tools` n'est envoyé au modèle.
+- **Mascotte dessinée au Canvas** : `LobsterView` (idle qui flotte et cligne des
+  yeux, réflexion avec pinces qui tapotent, joie avec yeux `^ ^`) et
+  `LobsterBubbleView` (badge circulaire, halo pulsé, pastille verte).
+
+## Build
+
+Prérequis : JDK 21, Android SDK installé dans `/home/dev/android-sdk` (déjà
+référencé par `local.properties`). Le projet cible AGP 8.7.3, Kotlin 2.0.21,
+`compileSdk 35`, `minSdk 30`, JVM 17.
+
+```bash
+cd /home/dev/projects/bubbleclaw
+ANDROID_HOME=/home/dev/android-sdk \
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
+./gradlew assembleDebug --no-daemon
+```
+
+APK généré :
+
+```
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+Pour garder une copie de livraison :
+
+```bash
+mkdir -p dist
+cp app/build/outputs/apk/debug/app-debug.apk dist/bubbleclaw-debug.apk
+```
+
+Ne pas modifier `gradle.properties` : la mémoire est calibrée pour cette machine
+(`-Xmx1536m`, 2 workers, pas de daemon).
+
+Installation sur un téléphone branché :
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+## Configuration
+
+Ouvrir l'app → **Réglages** (ou appui long sur la bulle → Réglages).
+
+| Champ | Défaut | Rôle |
+|---|---|---|
+| URL du gateway | `http://192.168.1.57:18789/v1` | Base HTTP. Avec ou sans `/v1` : BubbleClaw ajoute `/v1` seulement s'il manque. |
+| Jeton | vide | Envoyé en `Authorization: Bearer …`. |
+| Modèle | `openclaw/boss` | Champ `model` de la requête. |
+| Session | `android:bubbleclaw` | Champ `user`, stable entre les lancements. |
+
+Interrupteurs :
+
+- **Capturer l'écran à chaque ouverture** (on) : sans capture, le chat fonctionne
+  mais sans image ni carte de contexte.
+- **Inclure le texte visible** (off) : ajoute un digest des textes de la fenêtre
+  active au premier message (max 1500 caractères).
+- **Mode contrôle** (off) : autorise les outils d'action sur l'écran.
+- **Réponses en streaming** (on) : désactivable pour forcer le mode non-stream.
+
+**Tester la connexion** fait un `GET /v1/models` et affiche les modèles trouvés,
+ou l'erreur réseau en français.
+
+## Permissions demandées et pourquoi
+
+- **Affichage par-dessus les autres apps** (`SYSTEM_ALERT_WINDOW`) : c'est la
+  bulle flottante.
+- **Service d'accessibilité** : capture d'écran native, lecture du nom de l'app,
+  de l'URL du navigateur, du texte visible, et exécution des gestes en mode
+  contrôle. Rien n'est lu en continu : la capture et le digest sont demandés au
+  moment où tu touches la bulle ou quand un outil `screenshot` est appelé.
+- **Notifications** (Android 13+) : notification du service de premier plan, avec
+  une action « Arrêter ».
+- **Internet** : uniquement vers le gateway configuré.
+- **RECEIVE_BOOT_COMPLETED** est déclarée dans le manifeste pour un usage futur ;
+  aucun receiver ne redémarre la bulle automatiquement pour l'instant.
+
+L'écran principal et les réglages affichent une checklist **en direct** de ces
+autorisations, avec un bouton par ligne. Si le service d'accessibilité est coupé,
+le chat s'ouvre quand même et explique ce qui manque au lieu de planter.
+
+## Architecture (décisions techniques)
+
+```
+app/src/main/java/dev/bubbleclaw/
+  BubbleClawApp.kt        initialisation des préférences
+  AppPrefs.kt             SharedPreferences (URL, jeton, modèle, session, options)
+  ScreenReaderService.kt  AccessibilityService : capture, app, URL, digest, gestes
+  BubbleService.kt        service foreground + overlay WindowManager
+  LobsterBubbleView.kt    badge circulaire animé
+  LobsterView.kt          mascotte Canvas (idle / thinking / happy)
+  ContextHolder.kt        passage en mémoire entre bulle et chat + snapshot contexte
+  ChatActivity.kt         UI du chat, carte contexte, rendu des messages
+  ChatViewModel.kt        conversation, boucle réseau/outils, survit à la rotation
+  ApiClient.kt            HttpURLConnection + org.json, SSE et non-stream
+  ControlTools.kt         schémas JSON des outils + exécution locale
+  Permissions.kt          checklist d'autorisations partagée
+  MainActivity.kt         onboarding + accueil
+  SettingsActivity.kt     réglages, test gateway, checklist, bulle on/off
+```
+
+Choix assumés :
+
+- **Aucune nouvelle dépendance** : `HttpURLConnection`, `org.json`,
+  `Executors`/`Thread`/`Handler`. Les seules libs sont celles du squelette
+  (AndroidX core/appcompat/material/constraintlayout/lifecycle).
+- **Pas de Compose**, uniquement des Views classiques, layouts XML et vues
+  construites à la main pour les bulles de message.
+- **Fichier de capture + `ContextHolder`** : l'image est écrite dans
+  `cacheDir/captures`, seuls des chemins passent par l'Intent (pas de limite
+  Binder), et le `ContextHolder` sert de raccourci en mémoire. Le cache est
+  élagué aux 20 captures les plus récentes.
+- **`ChatViewModel`** garde les messages, le texte en cours de streaming et la
+  boucle d'outils. L'activité ne fait que rendre l'état.
+- **Mode contrôle strictement conditionnel** : la liste `tools` est construite à
+  chaque requête seulement si `controlMode` est vrai **et** que le service
+  d'accessibilité est connecté. Sinon la clé `tools` est absente du JSON.
+- **Capture des outils** : après `screenshot()`, l'image fraîche est renvoyée
+  comme message utilisateur avec `data:image/jpeg;base64,…`, ce qui permet au
+  modèle de relire l'écran sans dépendre d'un format de tool-result exotique.
+- **Menu de la bulle** : `PopupMenu` ancré sur la vue overlay ; en cas d'échec du
+  token de fenêtre, un message explique que le menu est momentanément
+  indisponible plutôt que de planter.
+
+## Utilisation
+
+1. Accorder l'overlay, le service d'accessibilité et les notifications.
+2. Renseigner l'URL du gateway et le jeton, puis **Tester la connexion**.
+3. **Démarrer la bulle**. Le homard apparaît, se déplace et se colle aux bords.
+4. Toucher le homard : capture + ouverture du chat avec le contexte.
+5. Appui long : ouvrir le chat, basculer le mode contrôle, réglages, masquer.
+6. Dans le chat, la pastille verte et le homard joyeux signalent une réponse
+   arrivée.
+
+## Vérifié au build / à tester sur un vrai téléphone
+
+Vérifié ici : compilation `assembleDebug` verte à chaque phase, ressources et
+manifeste liés, aucune dépendance ajoutée, APK produit.
+
+À valider sur appareil (nécessite un gateway et un téléphone réels) :
+
+- capture réelle via le service d'accessibilité sur différentes apps ;
+- extraction de l'URL sur Chrome, Firefox, Brave, Edge, Samsung Internet, Opera,
+  DuckDuckGo, Vivaldi, Chromium ;
+- position de la bulle après rotation et redémarrage ;
+- affichage du menu long-press au-dessus d'autres apps ;
+- streaming SSE réel, gestion des tool calls et des six itérations ;
+- exécution des gestes et du texte dans des champs variés ;
+- comportement des insets sur Android 15 (edge-to-edge) ;
+- autorisation notifications sur Android 13/14/15.
+
+## Notes
+
+Code original écrit pour ce dépôt. Le projet PokeClaw (Apache-2.0) a servi de
+référence de patterns Accessibility/overlay ; aucun code d'Andee (licence
+custom) n'a été utilisé.

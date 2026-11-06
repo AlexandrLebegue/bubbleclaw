@@ -378,7 +378,9 @@ class BubbleService : Service() {
             }
             true
         }
-        popup.show()
+        runCatching { popup.show() }.onFailure {
+            Toast.makeText(this, "Menu momentanément indisponible.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
