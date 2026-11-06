@@ -75,7 +75,9 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        window.setBackgroundDrawable(
+            ColorDrawable(ContextCompat.getColor(this, R.color.ink))
+        )
         window.setDimAmount(0f)
         window.setWindowAnimations(0)
         window.setLayout(
