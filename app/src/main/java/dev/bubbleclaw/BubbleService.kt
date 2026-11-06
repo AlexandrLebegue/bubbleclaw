@@ -3,22 +3,381 @@ package dev.bubbleclaw
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.graphics.PixelFormat
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.provider.Settings
+import android.view.ContextThemeWrapper
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.appcompat.widget.PopupMenu
+import androidx.core.app.NotificationCompat
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.hypot
 
 class BubbleService : Service() {
+
+    companion object {
+        const val ACTION_START = "dev.bubbleclaw.action.START_BUBBLE"
+        const val ACTION_STOP = "dev.bubbleclaw.action.STOP_BUBBLE"
+        const val EXTRA_IMAGE_PATH = "extra_image_path"
+        const val EXTRA_THUMB_PATH = "extra_thumb_path"
+        const val EXTRA_CONTEXT = "extra_context"
+
+        private const val CHANNEL_ID = "bubble"
+        private const val NOTIFICATION_ID = 1
+        private const val MENU_OPEN = 1
+        private const val MENU_CONTROL = 2
+        private const val MENU_SETTINGS = 3
+        private const val MENU_HIDE = 4
+
+        @Volatile
+        private var instance: BubbleService? = null
+
+        fun start(context: Context) {
+            val intent = Intent(context, BubbleService::class.java).setAction(ACTION_START)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun stop(context: Context) {
+            context.startService(Intent(context, BubbleService::class.java).setAction(ACTION_STOP))
+        }
+
+        fun setState(state: BubbleState) {
+            val service = instance ?: return
+            service.bubbleView?.state = state
+        }
+
+        fun isRunning(): Boolean = instance != null
+    }
+
+    private var windowManager: WindowManager? = null
+    private var bubbleView: LobsterBubbleView? = null
+    private var params: WindowManager.LayoutParams? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var snapAnimator: android.animation.ValueAnimator? = null
+
+    private var downRawX = 0f
+    private var downRawY = 0f
+    private var startX = 0
+    private var startY = 0
+    private var dragging = false
+    private var longPressFired = false
+    private var capturing = false
+
+    private val longPressRunnable = Runnable {
+        if (!dragging) {
+            longPressFired = true
+            showMenu()
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+        createChannel()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val nm = getSystemService(NotificationManager::class.java)
-        val ch = NotificationChannel("bubble", "Bubble", NotificationManager.IMPORTANCE_LOW)
-        nm.createNotificationChannel(ch)
-        val n: Notification = Notification.Builder(this, "bubble")
-            .setContentTitle("BubbleClaw")
-            .setSmallIcon(android.R.drawable.ic_menu_info_details)
-            .build()
-        startForeground(1, n)
+        if (intent?.action == ACTION_STOP) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        startForeground(NOTIFICATION_ID, buildNotification())
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "Autorisation d'affichage par-dessus requise.", Toast.LENGTH_LONG).show()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (bubbleView == null) addBubble()
         return START_STICKY
     }
+
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        snapAnimator?.cancel()
+        bubbleView?.let { view ->
+            runCatching { windowManager?.removeView(view) }
+        }
+        bubbleView = null
+        params = null
+        instance = null
+        super.onDestroy()
+    }
+
+    private fun createChannel() {
+        val manager = getSystemService(NotificationManager::class.java)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.bubble_channel_name),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(R.string.bubble_channel_description)
+            setShowBadge(false)
+        }
+        manager.createNotificationChannel(channel)
+    }
+
+    private fun buildNotification(): Notification {
+        val openIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val stopIntent = PendingIntent.getService(
+            this,
+            1,
+            Intent(this, BubbleService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(getString(R.string.bubble_notification_title))
+            .setContentText(getString(R.string.bubble_notification_text))
+            .setContentIntent(openIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .addAction(0, getString(R.string.bubble_notification_stop), stopIntent)
+            .build()
+    }
+
+    private fun addBubble() {
+        val manager = getSystemService(WINDOW_SERVICE) as WindowManager
+        windowManager = manager
+        val size = dp(64)
+        val metrics = resources.displayMetrics
+        val width = metrics.widthPixels
+        val height = metrics.heightPixels
+
+        val view = LobsterBubbleView(this)
+        val layout = WindowManager.LayoutParams(
+            size,
+            size,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = width - size - dp(6)
+            y = AppPrefs.bubbleY.takeIf { it >= 0 } ?: (height / 3)
+        }
+        clampY(layout, height)
+
+        view.setOnTouchListener { _, event -> handleTouch(event, layout, width, height); true }
+        manager.addView(view, layout)
+        bubbleView = view
+        params = layout
+    }
+
+    private fun handleTouch(event: MotionEvent, layout: WindowManager.LayoutParams, width: Int, height: Int) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downRawX = event.rawX
+                downRawY = event.rawY
+                startX = layout.x
+                startY = layout.y
+                dragging = false
+                longPressFired = false
+                handler.postDelayed(longPressRunnable, 480)
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = event.rawX - downRawX
+                val dy = event.rawY - downRawY
+                if (!dragging && hypot(dx.toDouble(), dy.toDouble()) > dp(8).toDouble()) {
+                    dragging = true
+                    handler.removeCallbacks(longPressRunnable)
+                }
+                if (dragging) {
+                    layout.x = (startX + dx).toInt()
+                    layout.y = (startY + dy).toInt()
+                    clampY(layout, height)
+                    updateLayout(layout)
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                handler.removeCallbacks(longPressRunnable)
+                if (dragging) {
+                    snapToEdge(layout, width, height)
+                } else if (!longPressFired && event.actionMasked == MotionEvent.ACTION_UP) {
+                    onBubbleTap()
+                }
+                dragging = false
+            }
+        }
+    }
+
+    private fun clampY(layout: WindowManager.LayoutParams, screenHeight: Int) {
+        val minY = dp(24)
+        val maxY = (screenHeight - dp(64) - dp(24)).coerceAtLeast(minY)
+        layout.y = layout.y.coerceIn(minY, maxY)
+    }
+
+    private fun updateLayout(layout: WindowManager.LayoutParams) {
+        val view = bubbleView ?: return
+        runCatching { windowManager?.updateViewLayout(view, layout) }
+    }
+
+    private fun snapToEdge(layout: WindowManager.LayoutParams, width: Int, height: Int) {
+        clampY(layout, height)
+        val size = dp(64)
+        val center = layout.x + size / 2
+        val target = if (center < width / 2) 0 else width - size
+        AppPrefs.bubbleY = layout.y
+        snapAnimator?.cancel()
+        snapAnimator = android.animation.ValueAnimator.ofInt(layout.x, target).apply {
+            duration = 180
+            addUpdateListener {
+                layout.x = it.animatedValue as Int
+                updateLayout(layout)
+            }
+            start()
+        }
+    }
+
+    private fun onBubbleTap() {
+        if (capturing) return
+        capturing = true
+        val reader = ScreenReaderService.instance
+        val app = reader?.foregroundAppName
+        val page = reader?.currentPageUrl()
+        val title = reader?.currentWindowTitle
+        val time = SimpleDateFormat("HH:mm", Locale.FRANCE).format(Date())
+
+        if (reader == null || !AppPrefs.autoScreenshot) {
+            val info = ScreenContextInfo(
+                appName = app,
+                page = page,
+                windowTitle = title,
+                time = time,
+                imagePath = null,
+                thumbPath = null,
+                width = 0,
+                height = 0,
+                visibleText = if (AppPrefs.includeVisibleText) reader?.visibleTextDigest() else null,
+                accessibilityMissing = reader == null
+            )
+            capturing = false
+            openChat(info)
+            return
+        }
+
+        reader.capture { capture ->
+            if (capture == null) {
+                capturing = false
+                openChat(
+                    ScreenContextInfo(
+                        app, page, title, time, null, null, 0, 0, null, false
+                    )
+                )
+                return@capture
+            }
+            val directory = File(cacheDir, "captures").apply { mkdirs() }
+            val stamp = System.currentTimeMillis()
+            val imageFile = File(directory, "capture_$stamp.jpg")
+            val thumbFile = File(directory, "capture_${stamp}_thumb.jpg")
+            runCatching {
+                imageFile.writeBytes(capture.jpeg)
+                thumbFile.writeBytes(jpegOf(capture.thumbnail))
+            }
+            pruneCaptures(directory)
+            val info = ScreenContextInfo(
+                appName = app,
+                page = page,
+                windowTitle = title,
+                time = time,
+                imagePath = imageFile.takeIf { it.exists() }?.absolutePath,
+                thumbPath = thumbFile.takeIf { it.exists() }?.absolutePath,
+                width = capture.bitmap.width,
+                height = capture.bitmap.height,
+                visibleText = if (AppPrefs.includeVisibleText) reader.visibleTextDigest() else null,
+                accessibilityMissing = false
+            )
+            capturing = false
+            openChat(info)
+        }
+    }
+
+    private fun jpegOf(bitmap: android.graphics.Bitmap): ByteArray {
+        val stream = java.io.ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, stream)
+        return stream.toByteArray()
+    }
+
+    private fun pruneCaptures(directory: File) {
+        runCatching {
+            directory.listFiles()
+                ?.sortedByDescending { it.lastModified() }
+                ?.drop(20)
+                ?.forEach { it.delete() }
+        }
+    }
+
+    private fun openChat(info: ScreenContextInfo) {
+        ContextHolder.put(info)
+        bubbleView?.state = BubbleState.Idle
+        val intent = Intent(this, ChatActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(EXTRA_IMAGE_PATH, info.imagePath)
+            putExtra(EXTRA_THUMB_PATH, info.thumbPath)
+            putExtra(EXTRA_CONTEXT, info.summary())
+        }
+        runCatching { startActivity(intent) }
+    }
+
+    private fun showMenu() {
+        val view = bubbleView ?: return
+        val themed = ContextThemeWrapper(this, R.style.Theme_BubbleClaw)
+        val popup = PopupMenu(themed, view)
+        popup.menu.add(0, MENU_OPEN, 0, getString(R.string.menu_open_chat))
+        popup.menu.add(
+            0,
+            MENU_CONTROL,
+            1,
+            getString(if (AppPrefs.controlMode) R.string.menu_control_on else R.string.menu_control_off)
+        )
+        popup.menu.add(0, MENU_SETTINGS, 2, getString(R.string.menu_settings))
+        popup.menu.add(0, MENU_HIDE, 3, getString(R.string.menu_hide_bubble))
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                MENU_OPEN -> onBubbleTap()
+                MENU_CONTROL -> {
+                    AppPrefs.controlMode = !AppPrefs.controlMode
+                    val message = if (AppPrefs.controlMode) "Mode contrôle activé" else "Mode contrôle désactivé"
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                }
+                MENU_SETTINGS -> startActivity(
+                    Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+                MENU_HIDE -> {
+                    AppPrefs.bubbleEnabled = false
+                    Toast.makeText(this, "Bulle masquée", Toast.LENGTH_SHORT).show()
+                    stopSelf()
+                }
+            }
+            true
+        }
+        popup.show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
 }
