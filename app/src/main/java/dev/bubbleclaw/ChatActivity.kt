@@ -17,6 +17,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.text.method.LinkMovementMethod
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -346,7 +347,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
                 if (view == null || view.parent == null) {
                     streamingView = addAssistantBubble(text)
                 } else {
-                    view.text = text
+                    applyAssistantText(view, text)
                 }
             }
         } else {
@@ -455,10 +456,17 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     private fun addAssistantBubble(text: String): TextView {
         val row = bubbleRow(Gravity.START)
-        val bubble = bubbleTextView(text, R.drawable.bg_bubble_assistant, R.color.text_primary)
+        val bubble = bubbleTextView("", R.drawable.bg_bubble_assistant, R.color.text_primary)
+        applyAssistantText(bubble, text)
         row.addView(bubble)
         container.addView(row)
         return bubble
+    }
+
+    private fun applyAssistantText(view: TextView, text: String) {
+        view.text = MarkdownRenderer.render(this, text)
+        view.movementMethod = LinkMovementMethod.getInstance()
+        view.highlightColor = Color.TRANSPARENT
     }
 
     private fun addErrorView(reason: String) {
