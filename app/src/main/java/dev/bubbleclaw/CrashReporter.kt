@@ -34,6 +34,7 @@ object CrashReporter {
                 val trace = writer.toString().take(MAX_TRACE)
                 val stamp = System.currentTimeMillis()
                 runCatching { File(app.filesDir, "crash-$stamp.txt").writeText(trace) }
+                Diag.log("crash ${error.javaClass.simpleName}: ${error.message?.take(160).orEmpty()}")
                 if (AppPrefs.crashReportsEnabled) {
                     val sender = Thread { runCatching { post(app, trace) } }
                     sender.isDaemon = true

@@ -194,6 +194,17 @@
             app:backgroundTint="@color/panel_high"
             app:cornerRadius="16dp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/diagnostic_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/settings_diagnostic"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            app:backgroundTint="@color/panel_high"
+            app:cornerRadius="16dp" />
+
         <TextView
             style="@style/BubbleClaw.SectionTitle"
             android:layout_width="match_parent"

@@ -7,7 +7,9 @@ class BubbleClawApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppPrefs.init(this)
+        Diag.init(this)
         CrashReporter.install(this)
+        Diag.log("app start")
         lastCrashFile()?.let { Log.w("BubbleClaw", "previous crash: $it") }
     }
 

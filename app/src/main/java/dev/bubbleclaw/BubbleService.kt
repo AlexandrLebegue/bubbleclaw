@@ -69,6 +69,7 @@ class BubbleService : Service() {
 
         fun setState(state: BubbleState) {
             val service = instance ?: return
+            Diag.log("state=$state")
             service.bubbleView?.state = state
         }
 
@@ -141,25 +142,40 @@ class BubbleService : Service() {
         super.onCreate()
         instance = this
         chatActivity = null
-        createChannel()
+        Diag.log("service created")
+        runCatching { createChannel() }.onFailure { Diag.log("notification channel error: ${it.javaClass.simpleName}") }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Diag.log("service start action=${intent?.action ?: "none"}")
         if (intent?.action == ACTION_STOP) {
             stopSelf()
             return START_NOT_STICKY
         }
-        startForeground(NOTIFICATION_ID, buildNotification())
+        runCatching { startForeground(NOTIFICATION_ID, buildNotification()) }
+            .onFailure {
+                Diag.log("startForeground failed: ${it.javaClass.simpleName}")
+                runCatching { stopSelf() }
+                return START_NOT_STICKY
+            }
         if (!Settings.canDrawOverlays(this)) {
+            Diag.log("overlay permission missing")
             Toast.makeText(this, "Autorisation d'affichage par-dessus requise.", Toast.LENGTH_LONG).show()
             stopSelf()
             return START_NOT_STICKY
         }
         if (!AppPrefs.bubbleEnabled) {
+            Diag.log("bubble disabled")
             stopSelf()
             return START_NOT_STICKY
         }
-        if (bubbleView == null) addBubble()
+        if (bubbleView == null) {
+            runCatching { addBubble() }.onFailure {
+                Diag.log("addBubble failed: ${it.javaClass.simpleName}")
+                runCatching { stopSelf() }
+                return START_NOT_STICKY
+            }
+        }
         return START_STICKY
     }
 
@@ -184,6 +200,7 @@ class BubbleService : Service() {
         params = null
         chatActivity = null
         instance = null
+        Diag.log("service destroyed")
         super.onDestroy()
     }
 
@@ -324,6 +341,7 @@ class BubbleService : Service() {
 
     private fun onBubbleTap() {
         if (capturing) return
+        Diag.log("bubble tap")
         if (isChatOpen()) {
             bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
             closeChat()
@@ -340,6 +358,7 @@ class BubbleService : Service() {
         val time = SimpleDateFormat("HH:mm", Locale.FRANCE).format(Date())
 
         if (reader == null || !AppPrefs.autoScreenshot) {
+            Diag.log("capture skipped reader=${reader != null} auto=${AppPrefs.autoScreenshot}")
             val info = ScreenContextInfo(
                 appName = app,
                 page = page,
@@ -358,6 +377,7 @@ class BubbleService : Service() {
             return
         }
 
+        Diag.log("capture start")
         // Open the panel right away with a skeleton; the capture fills it in later.
         openChat(
             ScreenContextInfo(
@@ -378,6 +398,7 @@ class BubbleService : Service() {
 
         reader.capture { capture ->
             if (capture == null) {
+                Diag.log("capture failed")
                 capturing = false
                 handler.post {
                     ContextHolder.put(
@@ -388,6 +409,7 @@ class BubbleService : Service() {
                 }
                 return@capture
             }
+            Diag.log("capture ok ${capture.bitmap.width}x${capture.bitmap.height}")
             val directory = File(cacheDir, "captures").apply { mkdirs() }
             val stamp = System.currentTimeMillis()
             val imageFile = File(directory, "capture_$stamp.jpg")
@@ -437,6 +459,7 @@ class BubbleService : Service() {
     }
 
     private fun openChat(info: ScreenContextInfo) {
+        Diag.log("chat open requested")
         ContextHolder.put(info)
         bubbleView?.state = BubbleState.Idle
         val screenHeight = resources.displayMetrics.heightPixels
@@ -453,6 +476,7 @@ class BubbleService : Service() {
             putExtra(EXTRA_BUBBLE_Y, bubbleCenterY)
         }
         runCatching { startActivity(intent) }
+            .onFailure { Diag.log("chat start failed: ${it.javaClass.simpleName}") }
     }
 
     private fun animateBubbleSink() {
