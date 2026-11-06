@@ -1,0 +1,14 @@
+<resources>
+    <style name="Theme.BubbleClaw" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#FF5A4E</item>
+        <item name="colorSecondary">#FFB4A8</item>
+        <item name="android:statusBarColor">#141013</item>
+        <item name="android:navigationBarColor">#141013</item>
+        <item name="android:windowBackground">#141013</item>
+    </style>
+    <style name="Theme.BubbleClaw.Dialog" parent="Theme.Material3.Dark.Dialog">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>

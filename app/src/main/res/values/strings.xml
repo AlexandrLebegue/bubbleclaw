@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">BubbleClaw</string>
+    <string name="accessibility_label">BubbleClaw — contexte d\'écran</string>
+    <string name="accessibility_description">Permet à BubbleClaw de lire l\'application affichée, de capturer l\'écran avant l\'ouverture de la discussion et, si vous l\'activez, d\'agir sur l\'écran à votre demande.</string>
+</resources>
