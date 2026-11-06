@@ -18,6 +18,15 @@
     <string name="chat_thinking">OpenClaw réfléchit…</string>
     <string name="chat_tool_limit">Trop d\'actions enchaînées, je m\'arrête là. Reformule ou relance.</string>
     <string name="chat_context_prefix">[Contexte écran]</string>
+    <string name="chat_retake_context">Reprendre le contexte de l\'écran</string>
+    <string name="chat_context_attached">Contexte capturé pour le prochain message.</string>
+    <string name="chat_context_unavailable">Capture impossible : active le service d\'accessibilité.</string>
+    <string name="chat_empty_welcome">Touche la bulle, je regarde ton écran et on discute.</string>
+    <string name="chat_clear">Effacer la conversation</string>
+    <string name="chat_clear_confirm">Effacer toute la conversation ?</string>
+    <string name="chat_clear_yes">Effacer</string>
+    <string name="chat_clear_no">Annuler</string>
+    <string name="chat_cleared">Conversation effacée</string>
 
     <string name="settings_title">Réglages</string>
     <string name="settings_gateway">Gateway OpenClaw</string>
@@ -61,6 +70,7 @@
     <string name="menu_control_off">Mode contrôle : désactivé</string>
     <string name="menu_settings">Réglages</string>
     <string name="menu_hide_bubble">Masquer la bulle</string>
+    <string name="menu_clear_chat">Effacer la conversation</string>
 
     <string name="screenshot_fullscreen">Capture</string>
     <string name="close">Fermer</string>
