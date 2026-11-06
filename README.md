@@ -201,8 +201,9 @@ Choix assumés :
   Binder), et le `ContextHolder` sert de raccourci en mémoire. Le cache est
   élagué aux 20 captures les plus récentes.
 - **Panneau flottant plutôt qu'overlay dans le service** : `ChatActivity`
-  utilise un thème Dialog (fenêtre opaque, `windowIsFloating`, pas de dim
-  système) avec un fond plein écran et un panneau dessinés dans l'activité. C'est le
+  utilise une fenêtre plein écran opaque (pas de translucidité, pas de dim
+  système) avec un fond plein écran et un panneau flottant dessinés dans
+  l'activité. C'est le
   choix le plus stable sur Android 12–15 : l'IME reste géré par la fenêtre de
   l'activité (`adjustResize` + insets IME), la rotation et la sauvegarde d'état
   sont natives, et le service ne garde que la bulle.
