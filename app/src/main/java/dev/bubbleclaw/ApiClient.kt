@@ -9,6 +9,7 @@ import java.io.OutputStream
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.net.URL
 import java.net.UnknownHostException
 
@@ -26,10 +27,36 @@ class ApiClient(
     private val root = baseUrl.trim().trimEnd('/')
     private val apiRoot = if (root.endsWith("/v1")) root else "$root/v1"
 
+    @Volatile
+    private var activeConnection: HttpURLConnection? = null
+
+    @Volatile
+    private var cancelled = false
+
+    /** Aborts the in-flight request from another thread and closes its socket. */
+    fun cancel() {
+        cancelled = true
+        runCatching { activeConnection?.disconnect() }
+    }
+
     companion object {
         const val UNREACHABLE =
             "OpenClaw injoignable. Vérifie que le gateway écoute et que le téléphone est sur le même réseau (Tailscale ou Wi-Fi)."
         const val INVALID_TOKEN = "Jeton invalide."
+        const val INVALID_URL =
+            "URL du gateway invalide. Utilise une adresse complète commençant par http:// ou https://."
+
+        /** Returns a French error message when the configured base URL cannot be used. */
+        fun validateBaseUrl(baseUrl: String): String? {
+            val value = baseUrl.trim()
+            if (value.isEmpty()) return "URL du gateway vide. Renseigne l'adresse de ton gateway."
+            val uri = runCatching { URI(value) }.getOrNull()
+                ?: return INVALID_URL
+            if (uri.scheme?.lowercase() !in setOf("http", "https") || uri.host.isNullOrBlank()) {
+                return INVALID_URL
+            }
+            return null
+        }
 
         fun fromPrefs(): ApiClient = ApiClient(
             AppPrefs.baseUrl,
@@ -81,7 +108,7 @@ class ApiClient(
         } catch (e: Exception) {
             throw ApiException(networkMessage(e))
         } finally {
-            connection.disconnect()
+            release(connection)
         }
     }
 
@@ -136,7 +163,7 @@ class ApiClient(
         } catch (e: Exception) {
             throw ApiException(networkMessage(e))
         } finally {
-            connection.disconnect()
+            release(connection)
         }
     }
 
@@ -173,7 +200,7 @@ class ApiClient(
         } catch (e: Exception) {
             throw ApiException(networkMessage(e))
         } finally {
-            connection.disconnect()
+            release(connection)
         }
     }
 
@@ -211,6 +238,8 @@ class ApiClient(
         }
 
     private fun open(method: String, url: String, accept: String, timeoutMs: Int = 120_000): HttpURLConnection {
+        if (cancelled) throw ApiException("Requête annulée.")
+        validateBaseUrl(root)?.let { throw ApiException(it) }
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = method
         connection.connectTimeout = 8_000
@@ -220,7 +249,13 @@ class ApiClient(
         connection.setRequestProperty("Accept", accept)
         connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         if (token.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
+        activeConnection = connection
         return connection
+    }
+
+    private fun release(connection: HttpURLConnection) {
+        if (activeConnection === connection) activeConnection = null
+        runCatching { connection.disconnect() }
     }
 
     private fun write(connection: HttpURLConnection, payload: JSONObject) {

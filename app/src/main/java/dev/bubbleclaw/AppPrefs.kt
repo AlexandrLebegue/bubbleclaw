@@ -58,6 +58,10 @@ object AppPrefs {
         get() = prefs.getInt("bubbleY", -1)
         set(value) = prefs.edit().putInt("bubbleY", value).apply()
 
+    var bubbleOnLeft: Boolean
+        get() = prefs.getBoolean("bubbleOnLeft", false)
+        set(value) = prefs.edit().putBoolean("bubbleOnLeft", value).apply()
+
     var onboardingDone: Boolean
         get() = prefs.getBoolean("onboardingDone", false)
         set(value) = prefs.edit().putBoolean("onboardingDone", value).apply()

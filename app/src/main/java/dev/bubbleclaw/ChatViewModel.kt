@@ -30,6 +30,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val imageCache = HashMap<String, String>()
 
     @Volatile
+    private var activeClient: ApiClient? = null
+
+    @Volatile
     private var contextInfo: ScreenContextInfo? = null
 
     @Volatile
@@ -115,8 +118,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         startTurn()
     }
 
+    /** Stops the current turn, drops the partial answer and re-enables input immediately. */
+    fun cancel() {
+        if (!isStreaming) return
+        generation++
+        activeClient?.cancel()
+        main.post {
+            streamingText = ""
+            isStreaming = false
+            status = "En ligne"
+            BubbleService.setState(BubbleState.Idle)
+            notifyChanged()
+        }
+    }
+
     fun clearConversation() {
         generation++
+        activeClient?.cancel()
         synchronized(lock) {
             messageList.clear()
             lastQuestion = null
@@ -159,13 +177,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     null
                 }
-                val result = ApiClient.fromPrefs().send(buildWire(), tools) { piece ->
-                    main.post {
-                        if (turn == generation) {
-                            streamingText += piece
-                            notifyChanged()
+                val client = ApiClient.fromPrefs()
+                activeClient = client
+                val result = try {
+                    client.send(buildWire(), tools) { piece ->
+                        main.post {
+                            if (turn == generation) {
+                                streamingText += piece
+                                notifyChanged()
+                            }
                         }
                     }
+                } finally {
+                    if (activeClient === client) activeClient = null
                 }
                 if (turn != generation) return
 
@@ -322,6 +346,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
+        generation++
+        activeClient?.cancel()
+        BubbleService.setState(BubbleState.Idle)
         executor.shutdownNow()
         persistence.shutdown()
         listeners.clear()

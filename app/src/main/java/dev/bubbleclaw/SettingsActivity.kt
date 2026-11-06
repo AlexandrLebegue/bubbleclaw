@@ -65,7 +65,16 @@ class SettingsActivity : AppCompatActivity() {
 
         autoScreenshot.setOnCheckedChangeListener { _, checked -> AppPrefs.autoScreenshot = checked }
         visibleText.setOnCheckedChangeListener { _, checked -> AppPrefs.includeVisibleText = checked }
-        control.setOnCheckedChangeListener { _, checked -> AppPrefs.controlMode = checked }
+        control.setOnCheckedChangeListener { _, checked ->
+            AppPrefs.controlMode = checked
+            if (checked && !Permissions.accessibilityEnabled(this)) {
+                Toast.makeText(
+                    this,
+                    "Mode contrôle enregistré, mais le service d'accessibilité est coupé : active-le pour agir sur l'écran.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
         stream.setOnCheckedChangeListener { _, checked -> AppPrefs.streamEnabled = checked }
 
         testResult = findViewById(R.id.test_result)
@@ -81,6 +90,7 @@ class SettingsActivity : AppCompatActivity() {
                 .setNegativeButton(getString(R.string.chat_clear_no), null)
                 .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
                     ConversationStore.clear(this)
+                    BubbleService.clearChatIfOpen()
                     Toast.makeText(this, getString(R.string.chat_cleared), Toast.LENGTH_SHORT)
                         .show()
                 }
@@ -106,6 +116,11 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun testConnection() {
+        ApiClient.validateBaseUrl(AppPrefs.baseUrl)?.let { error ->
+            testResult.setTextColor(ContextCompat.getColor(this, R.color.danger))
+            testResult.text = error
+            return
+        }
         testButton.isEnabled = false
         testResult.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
         testResult.text = getString(R.string.settings_testing)
@@ -162,8 +177,8 @@ class SettingsActivity : AppCompatActivity() {
             )
             return
         }
-        BubbleService.start(this)
         AppPrefs.bubbleEnabled = true
+        BubbleService.start(this)
         if (!Permissions.accessibilityEnabled(this)) {
             Toast.makeText(this, "Active aussi le service d'accessibilité.", Toast.LENGTH_LONG).show()
         }

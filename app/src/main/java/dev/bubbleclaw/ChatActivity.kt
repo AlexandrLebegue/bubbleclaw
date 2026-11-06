@@ -1,6 +1,8 @@
 package dev.bubbleclaw
 
 import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
@@ -162,7 +164,9 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
         findViewById<TextView>(R.id.close_button).setOnClickListener { closePanel() }
         findViewById<ImageButton>(R.id.retake_context).setOnClickListener { captureContext() }
-        sendButton.setOnClickListener { submit() }
+        sendButton.setOnClickListener {
+            if (viewModel.isStreaming) viewModel.cancel() else submit()
+        }
         input.setOnEditorActionListener { _, actionId, event ->
             val enter = event != null &&
                 event.keyCode == KeyEvent.KEYCODE_ENTER &&
@@ -217,6 +221,10 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     fun requestCloseFromBubble() {
         closePanel()
+    }
+
+    fun clearConversationFromOutside() {
+        if (::viewModel.isInitialized) viewModel.clearConversation()
     }
 
     private fun closePanel() {
@@ -446,8 +454,12 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
                 if (viewModel.status == "Injoignable") R.color.danger else R.color.success
             )
         )
-        sendButton.isEnabled = !viewModel.isStreaming
-        sendButton.alpha = if (viewModel.isStreaming) 0.45f else 1f
+        sendButton.isEnabled = true
+        sendButton.alpha = 1f
+        sendButton.setImageResource(if (viewModel.isStreaming) R.drawable.ic_stop else R.drawable.ic_send)
+        sendButton.contentDescription = getString(
+            if (viewModel.isStreaming) R.string.chat_cancel else R.string.chat_send
+        )
 
         if (viewModel.isStreaming) {
             mascot.mood = LobsterMood.Thinking
@@ -523,7 +535,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     private fun addUserBubble(text: String): TextView {
         val row = bubbleRow(Gravity.END)
-        val bubble = bubbleTextView(text, R.drawable.bg_bubble_user, R.color.text_primary)
+        val bubble = bubbleTextView(text, R.drawable.bg_bubble_user, R.color.ink)
         row.addView(bubble)
         container.addView(row)
         return bubble
@@ -612,6 +624,18 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
+            setOnLongClickListener {
+                val clipboard = getSystemService(ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(
+                    ClipData.newPlainText(getString(R.string.app_name), this.text?.toString().orEmpty())
+                )
+                android.widget.Toast.makeText(
+                    this@ChatActivity,
+                    getString(R.string.chat_message_copied),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                true
+            }
         }
 
     private fun maxBubbleWidth(): Int =
@@ -636,6 +660,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             setImageBitmap(bitmap)
             scaleType = ImageView.ScaleType.FIT_CENTER
             setBackgroundColor(Color.BLACK)
+            contentDescription = getString(R.string.screenshot_fullscreen_description)
             setOnClickListener { dialog.dismiss() }
         }
         dialog.setContentView(

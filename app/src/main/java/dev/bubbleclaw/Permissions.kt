@@ -142,6 +142,8 @@ object Permissions {
                 setTextColor(ContextCompat.getColor(activity, R.color.coral_light))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setPadding(dp(activity, 12), dp(activity, 6), dp(activity, 4), dp(activity, 6))
+                minHeight = dp(activity, 48)
+                gravity = Gravity.CENTER_VERTICAL
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { action() }
