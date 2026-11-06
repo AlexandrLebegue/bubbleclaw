@@ -2,4 +2,66 @@
     <string name="app_name">BubbleClaw</string>
     <string name="accessibility_label">BubbleClaw — contexte d\'écran</string>
     <string name="accessibility_description">Permet à BubbleClaw de lire l\'application affichée, de capturer l\'écran avant l\'ouverture de la discussion et, si vous l\'activez, d\'agir sur l\'écran à votre demande.</string>
+
+    <string name="bubble_channel_name">Bulle persistante</string>
+    <string name="bubble_channel_description">Maintient le homard BubbleClaw disponible par-dessus les autres applications.</string>
+    <string name="bubble_notification_title">BubbleClaw est actif</string>
+    <string name="bubble_notification_text">Touchez le homard pour discuter.</string>
+    <string name="bubble_notification_stop">Arrêter</string>
+
+    <string name="chat_title">OpenClaw</string>
+    <string name="chat_online">En ligne</string>
+    <string name="chat_offline">Injoignable</string>
+    <string name="chat_hint">Pose ta question…</string>
+    <string name="chat_send">Envoyer</string>
+    <string name="chat_retry">Réessayer</string>
+    <string name="chat_thinking">OpenClaw réfléchit…</string>
+    <string name="chat_tool_limit">Trop d\'actions enchaînées, je m\'arrête là. Reformule ou relance.</string>
+    <string name="chat_context_prefix">[Contexte écran]</string>
+
+    <string name="settings_title">Réglages</string>
+    <string name="settings_gateway">Gateway OpenClaw</string>
+    <string name="settings_base_url">URL du gateway</string>
+    <string name="settings_token">Jeton</string>
+    <string name="settings_model">Modèle</string>
+    <string name="settings_session">Session</string>
+    <string name="settings_test">Tester la connexion</string>
+    <string name="settings_testing">Test en cours…</string>
+    <string name="settings_permissions">Autorisations</string>
+    <string name="settings_overlay">Afficher par-dessus les autres apps</string>
+    <string name="settings_accessibility">Service d\'accessibilité</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_granted">Accordée</string>
+    <string name="settings_missing">Manquante</string>
+    <string name="settings_open">Ouvrir</string>
+    <string name="settings_bubble_start">Démarrer la bulle</string>
+    <string name="settings_bubble_stop">Arrêter la bulle</string>
+    <string name="settings_how_title">Comment ça marche</string>
+    <string name="settings_how_body">BubbleClaw parle uniquement au gateway que tu configures ici. Rien ne quitte l\'appareil en dehors de ces requêtes. La capture d\'écran et le texte visible ne sont envoyés qu\'au moment où tu poses une question.</string>
+    <string name="settings_auto_screenshot">Capturer l\'écran à chaque ouverture</string>
+    <string name="settings_include_text">Inclure le texte visible dans le contexte</string>
+    <string name="settings_control">Mode contrôle (l\'agent peut agir)</string>
+    <string name="settings_stream">Réponses en streaming</string>
+    <string name="settings_saved">Réglages enregistrés</string>
+
+    <string name="main_tagline">Ton homard, par-dessus toutes tes apps.</string>
+    <string name="main_start">Démarrer la bulle</string>
+    <string name="main_settings">Réglages</string>
+    <string name="main_step1_title">1. La bulle</string>
+    <string name="main_step1_body">Un homard flotte sur ton écran. Touche-le pour discuter, laisse appuyé pour le menu.</string>
+    <string name="main_step2_title">2. Le contexte</string>
+    <string name="main_step2_body">Avant d\'ouvrir le chat, BubbleClaw photographie l\'écran et repère l\'app et la page.</string>
+    <string name="main_step3_title">3. La discussion</string>
+    <string name="main_step3_body">Ta question et la capture partent vers ton gateway OpenClaw. La réponse arrive en direct.</string>
+    <string name="main_next">Suivant</string>
+    <string name="main_done">C\'est parti</string>
+
+    <string name="menu_open_chat">Ouvrir la discussion</string>
+    <string name="menu_control_on">Mode contrôle : activé</string>
+    <string name="menu_control_off">Mode contrôle : désactivé</string>
+    <string name="menu_settings">Réglages</string>
+    <string name="menu_hide_bubble">Masquer la bulle</string>
+
+    <string name="screenshot_fullscreen">Capture</string>
+    <string name="close">Fermer</string>
 </resources>
