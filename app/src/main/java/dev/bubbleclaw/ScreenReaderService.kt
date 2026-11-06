@@ -12,6 +12,7 @@ import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.view.Display
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.io.ByteArrayOutputStream
@@ -192,12 +193,21 @@ class ScreenReaderService : AccessibilityService() {
         )
     }
 
+    fun screenWidthPx(): Int = runCatching {
+        (getSystemService(WindowManager::class.java)).maximumWindowMetrics.bounds.width()
+    }.getOrDefault(resources.displayMetrics.widthPixels)
+
+    fun screenHeightPx(): Int = runCatching {
+        (getSystemService(WindowManager::class.java)).maximumWindowMetrics.bounds.height()
+    }.getOrDefault(resources.displayMetrics.heightPixels)
+
     fun performScroll(direction: String, amount: Int): String {
         if (instance == null) return NOT_CONNECTED
-        val metrics = resources.displayMetrics
-        val cx = metrics.widthPixels / 2f
-        val cy = metrics.heightPixels / 2f
-        val offset = amount.coerceIn(60, metrics.heightPixels / 3).toFloat()
+        val width = screenWidthPx()
+        val height = screenHeightPx()
+        val cx = width / 2f
+        val cy = height / 2f
+        val offset = amount.coerceIn(60, height / 3).toFloat()
         return when (direction.lowercase()) {
             "up" -> performSwipe(cx, cy + offset, cx, cy - offset, 300)
             "down" -> performSwipe(cx, cy - offset, cx, cy + offset, 300)

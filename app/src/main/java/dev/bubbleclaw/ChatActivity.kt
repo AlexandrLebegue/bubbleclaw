@@ -42,8 +42,13 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private lateinit var contextThumb: ImageView
     private lateinit var appIcon: ImageView
     private lateinit var mascotSlot: FrameLayout
+    private lateinit var mascot: LobsterView
 
     private var renderedCount = -1
+    private var wasStreaming = false
+    private val happyReset = Runnable {
+        if (!viewModel.isStreaming) mascot.mood = LobsterMood.Idle
+    }
     private var streamingView: TextView? = null
     private var contextInfo: ScreenContextInfo? = null
 
@@ -64,6 +69,15 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         contextThumb = findViewById(R.id.context_thumb)
         appIcon = findViewById(R.id.app_icon)
         mascotSlot = findViewById(R.id.mascot_slot)
+
+        mascot = LobsterView(this)
+        mascotSlot.addView(
+            mascot,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(
@@ -97,6 +111,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     }
 
     override fun onDestroy() {
+        mascot.removeCallbacks(happyReset)
         viewModel.detach(this)
         super.onDestroy()
     }
@@ -206,6 +221,19 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         )
         sendButton.isEnabled = !viewModel.isStreaming
         sendButton.alpha = if (viewModel.isStreaming) 0.45f else 1f
+
+        if (viewModel.isStreaming) {
+            mascot.mood = LobsterMood.Thinking
+            wasStreaming = true
+        } else if (wasStreaming) {
+            mascot.mood = LobsterMood.Happy
+            wasStreaming = false
+            mascot.removeCallbacks(happyReset)
+            mascot.postDelayed(happyReset, 1600)
+        } else if (mascot.mood == LobsterMood.Thinking) {
+            mascot.mood = LobsterMood.Idle
+        }
+
         scrollToBottom()
     }
 

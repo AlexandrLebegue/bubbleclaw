@@ -143,18 +143,18 @@ object ControlTools {
     }
 
     private fun mapPoint(x: Double, y: Double, context: ScreenContextInfo?): Pair<Float, Float> {
-        val metrics = ScreenReaderService.instance?.resources?.displayMetrics
-        val screenW = metrics?.widthPixels?.toFloat() ?: return Pair(x.toFloat(), y.toFloat())
-        val screenH = metrics?.heightPixels?.toFloat() ?: return Pair(x.toFloat(), y.toFloat())
+        val service = ScreenReaderService.instance ?: return Pair(x.toFloat(), y.toFloat())
+        val screenW = service.screenWidthPx().toFloat()
+        val screenH = service.screenHeightPx().toFloat()
         val sx = if (context != null && context.width > 0) screenW / context.width else 1f
         val sy = if (context != null && context.height > 0) screenH / context.height else 1f
         return Pair((x * sx).toFloat(), (y * sy).toFloat())
     }
 
     private fun scaleY(context: ScreenContextInfo?): Double {
-        val metrics = ScreenReaderService.instance?.resources?.displayMetrics ?: return 1.0
+        val service = ScreenReaderService.instance ?: return 1.0
         return if (context != null && context.height > 0) {
-            metrics.heightPixels.toDouble() / context.height
+            service.screenHeightPx().toDouble() / context.height
         } else 1.0
     }
 
