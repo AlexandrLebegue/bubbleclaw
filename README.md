@@ -41,6 +41,11 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   puis le panneau se déploie depuis le centre de la bulle (0.85 → 1.0, fondu
   180 ms). La fermeture inverse dure 140 ms puis la bulle remonte. Retour
   haptique léger au tap.
+- **Second tap sur la bulle** : si la discussion est déjà ouverte, le même tap
+  joue l'animation inverse et ferme le panneau, sans nouvelle capture ni
+  réouverture. L'état est tenu par `BubbleService`, renseigné par `ChatActivity`
+  à la création et libéré à la destruction (rotation, retour arrière, fermeture
+  par tap extérieur), donc une activité morte ne bloque jamais la bulle.
 - **Chat en streaming SSE** vers `chat/completions`, avec repli automatique en
   non-streaming, messages d'erreur en français et bouton « Réessayer ».
 - **Conversation persistante** : le fil est enregistré dans

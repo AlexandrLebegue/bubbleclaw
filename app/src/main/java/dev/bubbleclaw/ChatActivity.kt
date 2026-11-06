@@ -74,6 +74,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
+        BubbleService.onChatOpened(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setBackgroundDrawable(
             ColorDrawable(ContextCompat.getColor(this, R.color.ink))
@@ -214,6 +215,10 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         }
     }
 
+    fun requestCloseFromBubble() {
+        closePanel()
+    }
+
     private fun closePanel() {
         if (closing) return
         closing = true
@@ -232,6 +237,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     }
 
     override fun onDestroy() {
+        BubbleService.onChatClosed(this)
         BubbleService.restoreBubble()
         ContextHolder.removeListener(contextListener)
         shimmer?.stop()
