@@ -18,14 +18,16 @@ import kotlin.math.sin
  */
 class BouncingDotsView @JvmOverloads constructor(
     context: Context,
-    private val dotCount: Int = 3
-) : View(context) {
+    attrs: android.util.AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
+    private val dotCount = 3
     private val density = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#FFB4A8")
     }
-    private val centers = FloatArray(dotCount)
+    private val centers = FloatArray(3)
     private var radius = 0f
     private var centerY = 0f
     private var amplitude = 0f
