@@ -67,15 +67,18 @@ class ScreenReaderService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        Diag.log("accessibility connected")
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         instance = null
+        Diag.log("accessibility unbound")
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         instance = null
+        Diag.log("accessibility destroyed")
         captureExecutor.shutdownNow()
         super.onDestroy()
     }

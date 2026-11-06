@@ -75,6 +75,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Diag.log("chat activity create")
         setContentView(R.layout.activity_chat)
         BubbleService.onChatOpened(this)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -245,6 +246,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     }
 
     override fun onDestroy() {
+        Diag.log("chat activity destroy")
         BubbleService.onChatClosed(this)
         BubbleService.restoreBubble()
         ContextHolder.removeListener(contextListener)

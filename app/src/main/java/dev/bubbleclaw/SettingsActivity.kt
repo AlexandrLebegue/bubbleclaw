@@ -87,6 +87,10 @@ class SettingsActivity : AppCompatActivity() {
         bubbleButton = findViewById(R.id.bubble_button)
         bubbleButton.setOnClickListener { toggleBubble() }
 
+        findViewById<MaterialButton>(R.id.diagnostic_button).setOnClickListener {
+            startActivity(android.content.Intent(this, DiagnosticActivity::class.java))
+        }
+
         findViewById<MaterialButton>(R.id.clear_chat_button).setOnClickListener {
             androidx.appcompat.app.AlertDialog.Builder(this)
                 .setMessage(getString(R.string.chat_clear_confirm))
@@ -152,6 +156,7 @@ class SettingsActivity : AppCompatActivity() {
                 ok = false
                 message = e.message ?: ApiClient.UNREACHABLE
             }
+            Diag.log(if (ok) "gateway test ok" else "gateway test failed")
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 testResult.text = message

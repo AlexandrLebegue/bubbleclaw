@@ -133,6 +133,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearConversation() {
+        Diag.log("conversation cleared")
         generation++
         activeClient?.cancel()
         synchronized(lock) {
@@ -158,6 +159,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startTurn() {
+        Diag.log("network turn start")
         val turn = generation
         isStreaming = true
         streamingText = ""
@@ -269,6 +271,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun fail(message: String, turn: Int) {
         if (turn != generation) return
+        Diag.log("network turn failed")
         addMessage(ChatMessage(role = "assistant", text = message, isError = true))
         main.post {
             if (turn != generation) return@post
