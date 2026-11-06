@@ -19,6 +19,8 @@
     <string name="chat_context_prefix">[Contexte écran]</string>
     <string name="chat_retake_context">Reprendre le contexte de l\'écran</string>
     <string name="chat_context_attached">Contexte capturé pour le prochain message.</string>
+    <string name="chat_capture_loading">Capture de l\'écran…</string>
+    <string name="chat_capture_preparing">Préparation du contexte…</string>
     <string name="chat_context_unavailable">Capture impossible : active le service d\'accessibilité.</string>
     <string name="chat_empty_welcome">Touche la bulle, je regarde ton écran et on discute.</string>
     <string name="chat_clear">Effacer la conversation</string>

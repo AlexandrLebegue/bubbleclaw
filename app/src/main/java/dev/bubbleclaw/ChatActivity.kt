@@ -57,6 +57,15 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private var thinkingView: ThinkingIndicatorView? = null
     private var contextInfo: ScreenContextInfo? = null
     private var currentImagePath: String? = null
+    private var shimmer: ShimmerDrawable? = null
+
+    private val contextListener: (ScreenContextInfo?) -> Unit = { info ->
+        if (info != null) {
+            contextInfo = info
+            populateContext(info)
+            if (!info.loading) viewModel.setContext(info)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +94,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         appIcon = findViewById(R.id.app_icon)
         mascotSlot = findViewById(R.id.mascot_slot)
         headerDots = findViewById(R.id.header_dots)
+
+        shimmer = ShimmerDrawable().also { contextCard.foreground = it }
 
         mascot = LobsterView(this)
         mascotSlot.addView(
@@ -125,9 +136,12 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         }
 
         viewModel = ViewModelProvider(this).get(ChatViewModel::class.java)
+        ContextHolder.addListener(contextListener)
         contextInfo = resolveContext()
         populateContext(contextInfo)
-        viewModel.setContext(contextInfo)
+        if (contextInfo != null && contextInfo?.loading == false) {
+            viewModel.setContext(contextInfo)
+        }
 
         findViewById<TextView>(R.id.close_button).setOnClickListener { finish() }
         findViewById<ImageButton>(R.id.retake_context).setOnClickListener { captureContext() }
@@ -149,6 +163,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     }
 
     override fun onDestroy() {
+        ContextHolder.removeListener(contextListener)
+        shimmer?.stop()
         mascot.removeCallbacks(happyReset)
         viewModel.detach(this)
         super.onDestroy()
@@ -181,6 +197,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     private fun populateContext(info: ScreenContextInfo?) {
         if (info == null) {
+            shimmer?.stop()
+            contextCard.foreground = null
             contextApp.text = "Contexte indisponible"
             contextPage.text = "Ouvre la discussion depuis la bulle pour capturer l'écran."
             contextThumb.visibility = View.GONE
@@ -188,6 +206,21 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             currentImagePath = null
             return
         }
+        if (info.loading) {
+            contextApp.text = getString(R.string.chat_capture_loading)
+            contextPage.text = info.page?.takeIf { it.isNotBlank() }
+                ?: info.windowTitle?.takeIf { it.isNotBlank() }
+                ?: getString(R.string.chat_capture_preparing)
+            contextThumb.visibility = View.GONE
+            currentImagePath = null
+            shimmer?.let {
+                contextCard.foreground = it
+                it.start()
+            }
+            return
+        }
+        shimmer?.stop()
+        contextCard.foreground = null
         contextApp.text = info.appName?.takeIf { it.isNotBlank() } ?: "Application inconnue"
         contextPage.text = when {
             info.accessibilityMissing -> "Service d'accessibilité désactivé — active-le dans les réglages."

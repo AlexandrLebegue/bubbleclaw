@@ -16,6 +16,8 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 data class ScreenCapture(
     val bitmap: Bitmap,
@@ -60,6 +62,7 @@ class ScreenReaderService : AccessibilityService() {
     private var foregroundLabel: String? = null
     private var windowTitle: String? = null
     private val labelCache = HashMap<String, String>()
+    private val captureExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -73,6 +76,7 @@ class ScreenReaderService : AccessibilityService() {
 
     override fun onDestroy() {
         instance = null
+        captureExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -117,24 +121,34 @@ class ScreenReaderService : AccessibilityService() {
             object : TakeScreenshotCallback {
                 override fun onSuccess(screenshot: ScreenshotResult) {
                     var buffer: android.hardware.HardwareBuffer? = null
+                    var full: Bitmap?
                     try {
                         buffer = screenshot.hardwareBuffer
-                        val wrapped = Bitmap.wrapHardwareBuffer(buffer, screenshot.colorSpace) ?: run {
-                            callback(null)
-                            return
-                        }
-                        val full = wrapped.copy(Bitmap.Config.ARGB_8888, false)
-                        val scaled = scaleToMaxWidth(full, MAX_WIDTH)
-                        val thumbnail = scaleToMaxWidth(scaled, THUMB_WIDTH)
-                        val jpeg = compressJpeg(scaled, JPEG_QUALITY)
-                        callback(ScreenCapture(scaled, thumbnail, jpeg))
+                        val wrapped = Bitmap.wrapHardwareBuffer(buffer, screenshot.colorSpace)
+                        full = wrapped?.copy(Bitmap.Config.ARGB_8888, false)
                     } catch (e: Exception) {
-                        callback(null)
+                        full = null
                     } finally {
                         try {
                             buffer?.close()
                         } catch (_: Exception) {
                         }
+                    }
+                    if (full == null) {
+                        callback(null)
+                        return
+                    }
+                    // Decoding/scale/JPEG are the expensive part: keep them off the main thread.
+                    captureExecutor.execute {
+                        val result = try {
+                            val scaled = scaleToMaxWidth(full, MAX_WIDTH)
+                            val thumbnail = scaleToMaxWidth(scaled, THUMB_WIDTH)
+                            val jpeg = compressJpeg(scaled, JPEG_QUALITY)
+                            ScreenCapture(scaled, thumbnail, jpeg)
+                        } catch (e: Exception) {
+                            null
+                        }
+                        callback(result)
                     }
                 }
 

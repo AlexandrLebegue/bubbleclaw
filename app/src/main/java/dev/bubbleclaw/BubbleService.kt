@@ -259,10 +259,12 @@ class BubbleService : Service() {
     private fun onBubbleTap() {
         if (capturing) return
         capturing = true
+        bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
         val reader = ScreenReaderService.instance
         val app = reader?.foregroundAppName
         val page = reader?.currentPageUrl()
         val title = reader?.currentWindowTitle
+        val pkg = reader?.foregroundAppPackage
         val time = SimpleDateFormat("HH:mm", Locale.FRANCE).format(Date())
 
         if (reader == null || !AppPrefs.autoScreenshot) {
@@ -277,22 +279,41 @@ class BubbleService : Service() {
                 height = 0,
                 visibleText = if (AppPrefs.includeVisibleText) reader?.visibleTextDigest() else null,
                 accessibilityMissing = reader == null,
-                appPackage = reader?.foregroundAppPackage
+                appPackage = pkg
             )
             capturing = false
             openChat(info)
             return
         }
 
+        // Open the panel right away with a skeleton; the capture fills it in later.
+        openChat(
+            ScreenContextInfo(
+                appName = app,
+                page = page,
+                windowTitle = title,
+                time = time,
+                imagePath = null,
+                thumbPath = null,
+                width = 0,
+                height = 0,
+                visibleText = null,
+                accessibilityMissing = false,
+                appPackage = pkg,
+                loading = true
+            )
+        )
+
         reader.capture { capture ->
             if (capture == null) {
                 capturing = false
-                openChat(
-                    ScreenContextInfo(
-                        app, page, title, time, null, null, 0, 0, null, false,
-                        reader.foregroundAppPackage
+                handler.post {
+                    ContextHolder.put(
+                        ScreenContextInfo(
+                            app, page, title, time, null, null, 0, 0, null, false, pkg
+                        )
                     )
-                )
+                }
                 return@capture
             }
             val directory = File(cacheDir, "captures").apply { mkdirs() }
@@ -304,21 +325,27 @@ class BubbleService : Service() {
                 thumbFile.writeBytes(jpegOf(capture.thumbnail))
             }
             pruneCaptures(directory)
-            val info = ScreenContextInfo(
-                appName = app,
-                page = page,
-                windowTitle = title,
-                time = time,
-                imagePath = imageFile.takeIf { it.exists() }?.absolutePath,
-                thumbPath = thumbFile.takeIf { it.exists() }?.absolutePath,
-                width = capture.bitmap.width,
-                height = capture.bitmap.height,
-                visibleText = if (AppPrefs.includeVisibleText) reader.visibleTextDigest() else null,
-                accessibilityMissing = false,
-                appPackage = reader.foregroundAppPackage
-            )
-            capturing = false
-            openChat(info)
+            val imagePath = imageFile.takeIf { it.exists() }?.absolutePath
+            val thumbPath = thumbFile.takeIf { it.exists() }?.absolutePath
+            val width = capture.bitmap.width
+            val height = capture.bitmap.height
+            handler.post {
+                val info = ScreenContextInfo(
+                    appName = app,
+                    page = page,
+                    windowTitle = title,
+                    time = time,
+                    imagePath = imagePath,
+                    thumbPath = thumbPath,
+                    width = width,
+                    height = height,
+                    visibleText = if (AppPrefs.includeVisibleText) reader.visibleTextDigest() else null,
+                    accessibilityMissing = false,
+                    appPackage = pkg
+                )
+                capturing = false
+                ContextHolder.put(info)
+            }
         }
     }
 
