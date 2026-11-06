@@ -20,10 +20,30 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   quand l'app est un navigateur connu, titre de fenêtre sinon, texte visible en
   option. La carte de contexte du chat affiche l'icône de l'app, la page, l'heure
   et la vignette (toucher la vignette = plein écran).
+- **Panneau de discussion flottant** : une fenêtre compacte (largeur 92 % de
+  l'écran plafonnée à 420 dp, hauteur maximale 62 % de la zone utile), coins
+  arrondis 24 dp, bordure corail, ombre, scrim noir à 35 %. Ancré en bas
+  au-dessus du clavier, ou en haut si la bulle est en bas de l'écran. Un tap
+  hors du panneau le ferme.
 - **Chat en streaming SSE** vers `chat/completions`, avec repli automatique en
   non-streaming, messages d'erreur en français et bouton « Réessayer ».
+- **Conversation persistante** : le fil est enregistré dans
+  `filesDir/conversation.json` (écriture atomique par fichier temporaire puis
+  `rename`), rechargé à chaque ouverture, et survit donc à la fermeture du
+  panneau, à la rotation et aux relances. Les captures jointes sont copiées dans
+  `cacheDir/conversation` et référencées par chemin, jamais en base64 dans le
+  JSON ; les fichiers orphelins sont nettoyés.
+- **Historique envoyé au gateway** : tout le fil utile (hors erreurs) dans
+  l'ordre, plafonné aux 40 derniers messages. Le premier message de la session
+  porte l'en-tête de contexte et l'image ; les suivants n'envoient que le texte.
+  Une icône appareil-photo dans la barre permet de rattacher une nouvelle
+  capture au message suivant.
 - **Session stable** : le même identifiant de session est réutilisé d'un
   lancement à l'autre, donc la conversation continue côté gateway.
+- **Animation de réflexion** : bulle dédiée avec le homard en humeur Thinking,
+  trois points qui rebondissent en décalé (boucle 900 ms, décalage 150 ms) et
+  légère pulsation. Elle disparaît dès le premier morceau de texte reçu ; aucun
+  texte « … » ou « Réflexion… » n'est affiché.
 - **Mode contrôle** (désactivé par défaut) : l'agent peut appeler des outils
   locaux (`tap`, `swipe`, `scroll`, `type_text`, `press_key`, `open_app`,
   `screenshot`). Les coordonnées sont exprimées dans celles de la capture, puis
@@ -31,7 +51,10 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   Quand le mode est off, **aucun** tableau `tools` n'est envoyé au modèle.
 - **Mascotte dessinée au Canvas** : `LobsterView` (idle qui flotte et cligne des
   yeux, réflexion avec pinces qui tapotent, joie avec yeux `^ ^`) et
-  `LobsterBubbleView` (badge circulaire, halo pulsé, pastille verte).
+  `LobsterBubbleView` (badge circulaire, halo pulsé, pastille verte). Le homard
+  interne au badge oscille en continu (3 dp, 3,6 s, rotation 1,5° en opposition
+  de phase ; 5 dp et 1,8 s en Thinking). Seule la vue interne bouge, jamais la
+  fenêtre overlay : le drag et les taps restent exacts.
 
 ## Build
 
@@ -120,8 +143,11 @@ app/src/main/java/dev/bubbleclaw/
   LobsterBubbleView.kt    badge circulaire animé
   LobsterView.kt          mascotte Canvas (idle / thinking / happy)
   ContextHolder.kt        passage en mémoire entre bulle et chat + snapshot contexte
-  ChatActivity.kt         UI du chat, carte contexte, rendu des messages
-  ChatViewModel.kt        conversation, boucle réseau/outils, survit à la rotation
+  ChatActivity.kt         panneau flottant, carte contexte, rendu des messages
+  ChatViewModel.kt        conversation persistée, boucle réseau/outils, rotation
+  ConversationStore.kt    JSON atomique, chemins d'images et nettoyage du cache
+  ThinkingIndicatorView.kt bulle de réflexion + points animés
+  MaxHeightScrollView.kt  plafonne la hauteur du fil dans le panneau
   ApiClient.kt            HttpURLConnection + org.json, SSE et non-stream
   ControlTools.kt         schémas JSON des outils + exécution locale
   Permissions.kt          checklist d'autorisations partagée
@@ -140,8 +166,20 @@ Choix assumés :
   `cacheDir/captures`, seuls des chemins passent par l'Intent (pas de limite
   Binder), et le `ContextHolder` sert de raccourci en mémoire. Le cache est
   élagué aux 20 captures les plus récentes.
+- **Panneau flottant plutôt qu'overlay dans le service** : `ChatActivity`
+  utilise un thème Dialog (fenêtre transparente, `windowIsFloating`, pas de
+  dim système) avec un scrim et un panneau dessinés dans l'activité. C'est le
+  choix le plus stable sur Android 12–15 : l'IME reste géré par la fenêtre de
+  l'activité (`adjustResize` + insets IME), la rotation et la sauvegarde d'état
+  sont natives, et le service ne garde que la bulle.
 - **`ChatViewModel`** garde les messages, le texte en cours de streaming et la
-  boucle d'outils. L'activité ne fait que rendre l'état.
+  boucle d'outils ; `ConversationStore` écrit chaque ajout dans un fichier
+  temporaire puis le renomme. L'activité ne fait que rendre l'état.
+- **Images de conversation** : le premier message (ou une reprise de contexte)
+  copie la capture dans `cacheDir/conversation` pour que l'élagage des captures
+  ne casse pas l'historique ; le JSON ne contient que le chemin.
+- **Effacement** : action confirmée dans le menu long-press de la bulle et dans
+  les réglages ; elle vide le JSON, le cache d'images et le fil en mémoire.
 - **Mode contrôle strictement conditionnel** : la liste `tools` est construite à
   chaque requête seulement si `controlMode` est vrai **et** que le service
   d'accessibilité est connecté. Sinon la clé `tools` est absente du JSON.
@@ -158,14 +196,18 @@ Choix assumés :
 2. Renseigner l'URL du gateway et le jeton, puis **Tester la connexion**.
 3. **Démarrer la bulle**. Le homard apparaît, se déplace et se colle aux bords.
 4. Toucher le homard : capture + ouverture du chat avec le contexte.
-5. Appui long : ouvrir le chat, basculer le mode contrôle, réglages, masquer.
+5. Appui long : ouvrir le chat, basculer le mode contrôle, réglages, effacer la
+   conversation, masquer.
 6. Dans le chat, la pastille verte et le homard joyeux signalent une réponse
    arrivée.
 
 ## Vérifié au build / à tester sur un vrai téléphone
 
-Vérifié ici : compilation `assembleDebug` verte à chaque phase, ressources et
-manifeste liés, aucune dépendance ajoutée, APK produit.
+Vérifié ici : compilation `assembleDebug` verte après chaque point, ressources
+et manifeste liés, aucune dépendance ajoutée, APK produit. Le panneau suit les
+insets IME, la conversation est relue depuis `conversation.json`, les animations
+sont démarrées/arrêtées avec le cycle de vie, et le chat vide affiche un accueil
+court (une phrase + le homard) au lieu d'un écran blanc.
 
 À valider sur appareil (nécessite un gateway et un téléphone réels) :
 
@@ -176,7 +218,10 @@ manifeste liés, aucune dépendance ajoutée, APK produit.
 - affichage du menu long-press au-dessus d'autres apps ;
 - streaming SSE réel, gestion des tool calls et des six itérations ;
 - exécution des gestes et du texte dans des champs variés ;
-- comportement des insets sur Android 15 (edge-to-edge) ;
+- comportement des insets sur Android 12 à 15 (panneau, IME, scrim, tap extérieur) ;
+- persistance réelle du fil après fermeture, rotation et redémarrage ;
+- animation de réflexion et disparition au premier chunk SSE ;
+- oscillation du homard dans la bulle et pause écran éteint ;
 - autorisation notifications sur Android 13/14/15.
 
 ## Notes
