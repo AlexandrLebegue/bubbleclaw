@@ -103,7 +103,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
         AppPrefs.bubbleEnabled = true
-        BubbleService.start(this)
+        if (!BubbleService.start(this)) {
+            Toast.makeText(
+                this,
+                "Android a refusé le démarrage du service. Rouvre l'application et réessaie.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
         if (!Permissions.accessibilityEnabled(this)) {
             Toast.makeText(
                 this,

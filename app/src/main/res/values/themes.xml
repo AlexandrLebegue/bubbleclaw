@@ -8,12 +8,10 @@
         <item name="android:fontFamily">sans</item>
     </style>
 
-    <style name="Theme.BubbleClaw.Chat" parent="Theme.BubbleClaw.Dialog">
-        <item name="android:windowIsFloating">false</item>
+    <style name="Theme.BubbleClaw.Chat" parent="Theme.BubbleClaw">
         <item name="android:windowBackground">@color/ink</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
-        <item name="android:backgroundDimEnabled">false</item>
         <item name="android:windowContentOverlay">@null</item>
     </style>
 

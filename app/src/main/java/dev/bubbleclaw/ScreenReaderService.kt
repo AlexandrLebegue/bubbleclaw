@@ -118,6 +118,7 @@ class ScreenReaderService : AccessibilityService() {
             callback(null)
             return
         }
+        runCatching {
         takeScreenshot(
             Display.DEFAULT_DISPLAY,
             mainExecutor,
@@ -156,10 +157,15 @@ class ScreenReaderService : AccessibilityService() {
                 }
 
                 override fun onFailure(errorCode: Int) {
+                    Diag.log("screen capture failure code=$errorCode")
                     callback(null)
                 }
             }
         )
+        }.onFailure {
+            Diag.log("screen capture error: ${it.javaClass.simpleName}")
+            callback(null)
+        }
     }
 
     fun currentPageUrl(): String? {
