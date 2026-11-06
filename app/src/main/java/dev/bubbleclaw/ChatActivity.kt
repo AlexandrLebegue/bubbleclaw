@@ -83,6 +83,9 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         runCatching {
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
             window.setDimAmount(0f)
             window.setWindowAnimations(0)
         }.onFailure { Diag.log("window styling failed: ${it.javaClass.simpleName}") }
