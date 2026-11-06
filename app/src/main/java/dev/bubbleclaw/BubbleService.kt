@@ -35,6 +35,8 @@ class BubbleService : Service() {
         const val EXTRA_THUMB_PATH = "extra_thumb_path"
         const val EXTRA_CONTEXT = "extra_context"
         const val EXTRA_BUBBLE_AT_BOTTOM = "extra_bubble_at_bottom"
+        const val EXTRA_BUBBLE_X = "extra_bubble_x"
+        const val EXTRA_BUBBLE_Y = "extra_bubble_y"
 
         private const val CHANNEL_ID = "bubble"
         private const val NOTIFICATION_ID = 1
@@ -66,6 +68,14 @@ class BubbleService : Service() {
         }
 
         fun isRunning(): Boolean = instance != null
+
+        fun sinkBubble() {
+            instance?.animateBubbleSink()
+        }
+
+        fun restoreBubble() {
+            instance?.animateBubbleRestore()
+        }
     }
 
     private var windowManager: WindowManager? = null
@@ -260,6 +270,7 @@ class BubbleService : Service() {
         if (capturing) return
         capturing = true
         bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+        animateBubbleSink()
         val reader = ScreenReaderService.instance
         val app = reader?.foregroundAppName
         val page = reader?.currentPageUrl()
@@ -368,15 +379,41 @@ class BubbleService : Service() {
         ContextHolder.put(info)
         bubbleView?.state = BubbleState.Idle
         val screenHeight = resources.displayMetrics.heightPixels
-        val bubbleCenter = (params?.y ?: 0) + dp(64) / 2
+        val size = dp(64)
+        val bubbleCenterX = (params?.x ?: 0) + size / 2
+        val bubbleCenterY = (params?.y ?: 0) + size / 2
         val intent = Intent(this, ChatActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(EXTRA_IMAGE_PATH, info.imagePath)
             putExtra(EXTRA_THUMB_PATH, info.thumbPath)
             putExtra(EXTRA_CONTEXT, info.summary())
-            putExtra(EXTRA_BUBBLE_AT_BOTTOM, bubbleCenter > screenHeight / 2)
+            putExtra(EXTRA_BUBBLE_AT_BOTTOM, bubbleCenterY > screenHeight / 2)
+            putExtra(EXTRA_BUBBLE_X, bubbleCenterX)
+            putExtra(EXTRA_BUBBLE_Y, bubbleCenterY)
         }
         runCatching { startActivity(intent) }
+    }
+
+    private fun animateBubbleSink() {
+        val view = bubbleView ?: return
+        view.animate().cancel()
+        view.animate()
+            .scaleX(0.86f)
+            .scaleY(0.86f)
+            .setDuration(90)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .start()
+    }
+
+    private fun animateBubbleRestore() {
+        val view = bubbleView ?: return
+        view.animate().cancel()
+        view.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(140)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .start()
     }
 
     private fun showMenu() {

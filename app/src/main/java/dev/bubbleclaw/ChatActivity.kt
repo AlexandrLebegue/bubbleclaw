@@ -59,6 +59,9 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private var contextInfo: ScreenContextInfo? = null
     private var currentImagePath: String? = null
     private var shimmer: ShimmerDrawable? = null
+    private var bubbleCenterX = -1
+    private var bubbleCenterY = -1
+    private var closing = false
 
     private val contextListener: (ScreenContextInfo?) -> Unit = { info ->
         if (info != null) {
@@ -74,6 +77,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         window.setDimAmount(0f)
+        window.setWindowAnimations(0)
         window.setLayout(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT
@@ -95,6 +99,14 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         appIcon = findViewById(R.id.app_icon)
         mascotSlot = findViewById(R.id.mascot_slot)
         headerDots = findViewById(R.id.header_dots)
+
+        bubbleCenterX = intent.getIntExtra(BubbleService.EXTRA_BUBBLE_X, -1)
+        bubbleCenterY = intent.getIntExtra(BubbleService.EXTRA_BUBBLE_Y, -1)
+        if (savedInstanceState == null) {
+            panel.alpha = 0f
+            panel.scaleX = 0.85f
+            panel.scaleY = 0.85f
+        }
 
         shimmer = ShimmerDrawable().also { contextCard.foreground = it }
 
@@ -122,8 +134,9 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         panel.layoutParams = panelParams
         panel.setOnClickListener { }
         contextCard.setOnClickListener { showFullScreen(currentImagePath) }
+        BubbleService.sinkBubble()
 
-        root.setOnClickListener { finish() }
+        root.setOnClickListener { closePanel() }
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val system = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -144,7 +157,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             viewModel.setContext(contextInfo)
         }
 
-        findViewById<TextView>(R.id.close_button).setOnClickListener { finish() }
+        findViewById<TextView>(R.id.close_button).setOnClickListener { closePanel() }
         findViewById<ImageButton>(R.id.retake_context).setOnClickListener { captureContext() }
         sendButton.setOnClickListener { submit() }
         input.setOnEditorActionListener { _, actionId, event ->
@@ -161,9 +174,63 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
         viewModel.attach(this)
         render()
+        if (savedInstanceState == null) {
+            playPanelEntrance()
+        } else {
+            panel.alpha = 1f
+            panel.scaleX = 1f
+            panel.scaleY = 1f
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        closePanel()
+    }
+
+    private fun playPanelEntrance() {
+        panel.post {
+            if (isFinishing || isDestroyed) return@post
+            val location = IntArray(2)
+            panel.getLocationOnScreen(location)
+            if (bubbleCenterX >= 0 && bubbleCenterY >= 0) {
+                panel.pivotX = (bubbleCenterX - location[0]).toFloat()
+                panel.pivotY = (bubbleCenterY - location[1]).toFloat()
+            } else {
+                panel.pivotX = panel.width / 2f
+                panel.pivotY = panel.height.toFloat()
+            }
+            panel.animate().cancel()
+            panel.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setStartDelay(150)
+                .setDuration(180)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+        }
+    }
+
+    private fun closePanel() {
+        if (closing) return
+        closing = true
+        panel.animate().cancel()
+        panel.animate()
+            .alpha(0f)
+            .scaleX(0.85f)
+            .scaleY(0.85f)
+            .setDuration(140)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                finish()
+                overridePendingTransition(0, 0)
+            }
+            .start()
     }
 
     override fun onDestroy() {
+        BubbleService.restoreBubble()
         ContextHolder.removeListener(contextListener)
         shimmer?.stop()
         mascot.removeCallbacks(happyReset)
