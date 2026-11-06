@@ -18,13 +18,28 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   plus une vignette 320 px.
 - **Contexte automatique** : nom de l'application au premier plan, URL de la page
   quand l'app est un navigateur connu, titre de fenêtre sinon, texte visible en
-  option. La carte de contexte du chat affiche l'icône de l'app, la page, l'heure
-  et la vignette (toucher la vignette = plein écran).
+  option. La carte de contexte est une seule ligne compacte : icône de l'app,
+  nom, page et vignette 36 dp. Toute la ligne ouvre la capture en plein écran.
 - **Panneau de discussion flottant** : une fenêtre compacte (largeur 92 % de
-  l'écran plafonnée à 420 dp, hauteur maximale 62 % de la zone utile), coins
-  arrondis 24 dp, bordure corail, ombre, scrim noir à 35 %. Ancré en bas
-  au-dessus du clavier, ou en haut si la bulle est en bas de l'écran. Un tap
-  hors du panneau le ferme.
+  l'écran plafonnée à 420 dp, hauteur maximale 52 % de la zone utile), coins
+  arrondis 24 dp, bordure corail, ombre, scrim noir à 35 %. Marge de 16 dp sur
+  les côtés et 24 dp au-dessus de la barre de navigation. Le panneau est ancré
+  du même côté que la bulle (en haut à 24 dp sous la barre d'état, ou en bas).
+  Un tap hors du panneau le ferme.
+- **Ouverture immédiate** : le panneau s'affiche au tap avec un squelette
+  « Capture de l'écran… » et un shimmer, puis la carte se remplit quand la
+  capture est prête, sans relancer l'activité. Le décodage, le redimensionnement
+  et la compression JPEG tournent sur un executor dédié, jamais sur le thread
+  principal.
+- **Rendu markdown** : gras, italique, code inline, blocs de code, titres,
+  listes à puces et numérotées, liens cliquables corail et séparateurs. Les
+  messages de l'assistant sont rendus en `Spannable` par un parser et un
+  renderer maison, tolérants au markdown partiel du streaming ; les messages
+  utilisateur restent en texte simple.
+- **Animation d'ouverture** : la bulle s'enfonce (0.86, 90 ms), pause de 60 ms,
+  puis le panneau se déploie depuis le centre de la bulle (0.85 → 1.0, fondu
+  180 ms). La fermeture inverse dure 140 ms puis la bulle remonte. Retour
+  haptique léger au tap.
 - **Chat en streaming SSE** vers `chat/completions`, avec repli automatique en
   non-streaming, messages d'erreur en français et bouton « Réessayer ».
 - **Conversation persistante** : le fil est enregistré dans
@@ -145,6 +160,9 @@ app/src/main/java/dev/bubbleclaw/
   ContextHolder.kt        passage en mémoire entre bulle et chat + snapshot contexte
   ChatActivity.kt         panneau flottant, carte contexte, rendu des messages
   ChatViewModel.kt        conversation persistée, boucle réseau/outils, rotation
+  MarkdownParser.kt       parser markdown pur Kotlin (blocs + inline)
+  MarkdownRenderer.kt     conversion du parser en Spannable Android
+  ShimmerDrawable.kt      shimmer du squelette de contexte
   ConversationStore.kt    JSON atomique, chemins d'images et nettoyage du cache
   ThinkingIndicatorView.kt bulle de réflexion + points animés
   MaxHeightScrollView.kt  plafonne la hauteur du fil dans le panneau
@@ -203,11 +221,12 @@ Choix assumés :
 
 ## Vérifié au build / à tester sur un vrai téléphone
 
-Vérifié ici : compilation `assembleDebug` verte après chaque point, ressources
-et manifeste liés, aucune dépendance ajoutée, APK produit. Le panneau suit les
-insets IME, la conversation est relue depuis `conversation.json`, les animations
-sont démarrées/arrêtées avec le cycle de vie, et le chat vide affiche un accueil
-court (une phrase + le homard) au lieu d'un écran blanc.
+Vérifié ici : compilation `assembleDebug` verte après chaque point, test JVM
+`testDebugUnitTest` vert (markdown : gras, code inline, bloc de code, listes,
+markdown partiel), ressources et manifeste liés, APK produit. Le panneau suit
+les insets IME, la conversation est relue depuis `conversation.json`, les
+animations sont démarrées/arrêtées avec le cycle de vie, et le chat vide affiche
+un accueil court (une phrase + le homard) au lieu d'un écran blanc.
 
 À valider sur appareil (nécessite un gateway et un téléphone réels) :
 
@@ -222,7 +241,9 @@ court (une phrase + le homard) au lieu d'un écran blanc.
 - persistance réelle du fil après fermeture, rotation et redémarrage ;
 - animation de réflexion et disparition au premier chunk SSE ;
 - oscillation du homard dans la bulle et pause écran éteint ;
-- autorisation notifications sur Android 13/14/15.
+- autorisation notifications sur Android 13/14/15 ;
+- fluidité perçue de l'ouverture (< 150 ms) et du déploiement depuis la bulle ;
+- rendu markdown réel pendant un flux SSE et ouverture des liens.
 
 ## Notes
 
