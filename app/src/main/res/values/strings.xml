@@ -15,7 +15,6 @@
     <string name="chat_hint">Pose ta question…</string>
     <string name="chat_send">Envoyer</string>
     <string name="chat_retry">Réessayer</string>
-    <string name="chat_thinking">OpenClaw réfléchit…</string>
     <string name="chat_tool_limit">Trop d\'actions enchaînées, je m\'arrête là. Reformule ou relance.</string>
     <string name="chat_context_prefix">[Contexte écran]</string>
     <string name="chat_retake_context">Reprendre le contexte de l\'écran</string>
