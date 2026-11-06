@@ -21,6 +21,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.app.NotificationCompat
 import java.io.File
+import java.lang.ref.WeakReference
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,6 +50,9 @@ class BubbleService : Service() {
         @Volatile
         private var instance: BubbleService? = null
 
+        @Volatile
+        private var chatActivity: WeakReference<ChatActivity>? = null
+
         fun start(context: Context) {
             val intent = Intent(context, BubbleService::class.java).setAction(ACTION_START)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
@@ -68,6 +72,25 @@ class BubbleService : Service() {
         }
 
         fun isRunning(): Boolean = instance != null
+
+        fun onChatOpened(activity: ChatActivity) {
+            chatActivity = WeakReference(activity)
+        }
+
+        fun onChatClosed(activity: ChatActivity) {
+            if (chatActivity?.get() === activity) chatActivity = null
+        }
+
+        fun isChatOpen(): Boolean {
+            val activity = chatActivity?.get() ?: return false
+            return !activity.isFinishing && !activity.isDestroyed
+        }
+
+        fun closeChat() {
+            val activity = chatActivity?.get() ?: return
+            if (activity.isFinishing || activity.isDestroyed) return
+            activity.requestCloseFromBubble()
+        }
 
         fun sinkBubble() {
             instance?.animateBubbleSink()
@@ -104,6 +127,7 @@ class BubbleService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        chatActivity = null
         createChannel()
     }
 
@@ -130,6 +154,7 @@ class BubbleService : Service() {
         }
         bubbleView = null
         params = null
+        chatActivity = null
         instance = null
         super.onDestroy()
     }
@@ -268,6 +293,11 @@ class BubbleService : Service() {
 
     private fun onBubbleTap() {
         if (capturing) return
+        if (isChatOpen()) {
+            bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+            closeChat()
+            return
+        }
         capturing = true
         bubbleView?.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
         animateBubbleSink()
