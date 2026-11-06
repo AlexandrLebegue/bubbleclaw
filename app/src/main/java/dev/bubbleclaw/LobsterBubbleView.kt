@@ -1,16 +1,21 @@
 package dev.bubbleclaw
 
 import android.animation.ValueAnimator
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
+import android.os.Build
 import android.util.AttributeSet
 import android.view.View
 import android.view.animation.LinearInterpolator
+import androidx.core.content.ContextCompat
 import kotlin.math.min
 import kotlin.math.sin
 
@@ -18,7 +23,8 @@ enum class BubbleState { Idle, Thinking, AnswerReady }
 
 /**
  * Circular coral badge containing the BubbleClaw lobster head.
- * All geometry is precomputed; onDraw only paints.
+ * The lobster itself floats inside the badge; the overlay window never moves.
+ * All geometry is precomputed; onDraw only paints and uses no allocations.
  */
 class LobsterBubbleView @JvmOverloads constructor(
     context: Context,
@@ -59,6 +65,11 @@ class LobsterBubbleView @JvmOverloads constructor(
         color = Color.WHITE
     }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFB4A8") }
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(1.2f)
+        color = Color.parseColor("#55FFE3DA")
+    }
 
     private val smilePath = Path()
     private val antennaLeft = Path()
@@ -71,6 +82,8 @@ class LobsterBubbleView @JvmOverloads constructor(
     private var bodyRadius = 0f
     private var eyeRadius = 0f
     private var phase = 0f
+    private var floatPhase = 0f
+    private var screenOn = true
 
     private val pulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
         duration = 1500
@@ -80,6 +93,24 @@ class LobsterBubbleView @JvmOverloads constructor(
         addUpdateListener {
             phase = it.animatedValue as Float
             invalidate()
+        }
+    }
+
+    private val floatAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 3600
+        repeatCount = ValueAnimator.INFINITE
+        repeatMode = ValueAnimator.RESTART
+        interpolator = LinearInterpolator()
+        addUpdateListener {
+            floatPhase = it.animatedValue as Float
+            invalidate()
+        }
+    }
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            screenOn = intent?.action != Intent.ACTION_SCREEN_OFF
+            updateAnimation()
         }
     }
 
@@ -122,15 +153,50 @@ class LobsterBubbleView @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        screenOn = true
+        registerScreenReceiver()
         updateAnimation()
     }
 
     override fun onDetachedFromWindow() {
+        runCatching { context.unregisterReceiver(screenReceiver) }
         pulseAnimator.cancel()
+        floatAnimator.cancel()
         super.onDetachedFromWindow()
     }
 
+    private fun registerScreenReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(screenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                ContextCompat.registerReceiver(
+                    context,
+                    screenReceiver,
+                    filter,
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+                )
+            }
+        }
+    }
+
     private fun updateAnimation() {
+        val attached = isAttachedToWindow
+        if (!attached || !screenOn) {
+            pulseAnimator.cancel()
+            floatAnimator.cancel()
+            return
+        }
+        val duration = if (state == BubbleState.Thinking) 1800L else 3600L
+        if (!floatAnimator.isStarted || floatAnimator.duration != duration) {
+            floatAnimator.cancel()
+            floatAnimator.duration = duration
+            floatAnimator.start()
+        }
         if (state == BubbleState.Thinking) {
             if (!pulseAnimator.isStarted) pulseAnimator.start()
         } else {
@@ -145,10 +211,20 @@ class LobsterBubbleView @JvmOverloads constructor(
         if (bodyRadius <= 0f) return
 
         if (state == BubbleState.Thinking) {
-            val haloRadius = bodyRadius * (1.12f + 0.10f * sin(phase * Math.PI * 2).toFloat())
-            haloPaint.alpha = (110 + 80 * sin(phase * Math.PI * 2).toFloat()).toInt().coerceIn(40, 190)
+            val wave = sin(phase * Math.PI * 2).toFloat()
+            val haloRadius = bodyRadius * (1.12f + 0.10f * wave)
+            haloPaint.alpha = (110 + 80 * wave).toInt().coerceIn(40, 190)
             canvas.drawCircle(cx, cy, haloRadius, haloPaint)
         }
+
+        val wave = sin(floatPhase * Math.PI * 2).toFloat()
+        val amplitude = dp(if (state == BubbleState.Thinking) 5f else 3f)
+        val bob = wave * amplitude
+        val rotation = -wave * 1.5f
+
+        canvas.save()
+        canvas.translate(0f, bob)
+        canvas.rotate(rotation, cx, cy)
 
         canvas.drawPath(clawLeft, highlightPaint)
         canvas.drawPath(clawRight, highlightPaint)
@@ -157,7 +233,7 @@ class LobsterBubbleView @JvmOverloads constructor(
         canvas.drawPath(antennaRight, linePaint)
 
         canvas.drawCircle(cx, cy, bodyRadius, bodyPaint)
-        canvas.drawCircle(cx, cy, bodyRadius, highlightEdgePaint())
+        canvas.drawCircle(cx, cy, bodyRadius, edgePaint)
 
         val eyeY = cy - bodyRadius * 0.13f
         val eyeOffset = bodyRadius * 0.36f
@@ -181,11 +257,13 @@ class LobsterBubbleView @JvmOverloads constructor(
         if (state == BubbleState.Thinking) {
             val baseY = cy + bodyRadius * 0.92f
             for (i in 0..2) {
-                val wave = sin((phase + i * 0.18f) * Math.PI * 2).toFloat()
-                dotPaint.alpha = (110 + 120 * wave).toInt().coerceIn(30, 255)
+                val dotWave = sin((phase + i * 0.18f) * Math.PI * 2).toFloat()
+                dotPaint.alpha = (110 + 120 * dotWave).toInt().coerceIn(30, 255)
                 canvas.drawCircle(cx + (i - 1) * dp(6f), baseY, dp(2.2f), dotPaint)
             }
         }
+
+        canvas.restore()
 
         if (state == BubbleState.AnswerReady) {
             val badgeX = width - dp(11f)
@@ -193,15 +271,5 @@ class LobsterBubbleView @JvmOverloads constructor(
             canvas.drawCircle(badgeX, badgeY, dp(7f), badgePaint)
             canvas.drawCircle(badgeX, badgeY, dp(7f), badgeRingPaint)
         }
-    }
-
-    private fun highlightEdgePaint(): Paint {
-        return edgePaint
-    }
-
-    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = dp(1.2f)
-        color = Color.parseColor("#55FFE3DA")
     }
 }
