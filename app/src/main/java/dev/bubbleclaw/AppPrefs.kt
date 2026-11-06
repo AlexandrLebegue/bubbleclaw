@@ -54,6 +54,10 @@ object AppPrefs {
         get() = prefs.getBoolean("streamEnabled", true)
         set(value) = prefs.edit().putBoolean("streamEnabled", value).apply()
 
+    var crashReportsEnabled: Boolean
+        get() = prefs.getBoolean("crashReportsEnabled", true)
+        set(value) = prefs.edit().putBoolean("crashReportsEnabled", value).apply()
+
     var bubbleY: Int
         get() = prefs.getInt("bubbleY", -1)
         set(value) = prefs.edit().putInt("bubbleY", value).apply()

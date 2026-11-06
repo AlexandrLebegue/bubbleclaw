@@ -57,11 +57,13 @@ class SettingsActivity : AppCompatActivity() {
         val visibleText = findViewById<SwitchMaterial>(R.id.switch_visible_text)
         val control = findViewById<SwitchMaterial>(R.id.switch_control)
         val stream = findViewById<SwitchMaterial>(R.id.switch_stream)
+        val crashReports = findViewById<SwitchMaterial>(R.id.switch_crash_reports)
 
         autoScreenshot.isChecked = AppPrefs.autoScreenshot
         visibleText.isChecked = AppPrefs.includeVisibleText
         control.isChecked = AppPrefs.controlMode
         stream.isChecked = AppPrefs.streamEnabled
+        crashReports.isChecked = AppPrefs.crashReportsEnabled
 
         autoScreenshot.setOnCheckedChangeListener { _, checked -> AppPrefs.autoScreenshot = checked }
         visibleText.setOnCheckedChangeListener { _, checked -> AppPrefs.includeVisibleText = checked }
@@ -76,6 +78,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
         stream.setOnCheckedChangeListener { _, checked -> AppPrefs.streamEnabled = checked }
+        crashReports.setOnCheckedChangeListener { _, checked -> AppPrefs.crashReportsEnabled = checked }
 
         testResult = findViewById(R.id.test_result)
         testButton = findViewById(R.id.test_button)
