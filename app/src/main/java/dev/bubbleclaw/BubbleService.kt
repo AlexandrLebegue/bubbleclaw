@@ -17,6 +17,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.app.NotificationCompat
 import java.io.File
@@ -41,6 +42,7 @@ class BubbleService : Service() {
         private const val MENU_CONTROL = 2
         private const val MENU_SETTINGS = 3
         private const val MENU_HIDE = 4
+        private const val MENU_CLEAR = 5
 
         @Volatile
         private var instance: BubbleService? = null
@@ -362,7 +364,8 @@ class BubbleService : Service() {
             getString(if (AppPrefs.controlMode) R.string.menu_control_on else R.string.menu_control_off)
         )
         popup.menu.add(0, MENU_SETTINGS, 2, getString(R.string.menu_settings))
-        popup.menu.add(0, MENU_HIDE, 3, getString(R.string.menu_hide_bubble))
+        popup.menu.add(0, MENU_CLEAR, 3, getString(R.string.menu_clear_chat))
+        popup.menu.add(0, MENU_HIDE, 4, getString(R.string.menu_hide_bubble))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_OPEN -> onBubbleTap()
@@ -374,6 +377,7 @@ class BubbleService : Service() {
                 MENU_SETTINGS -> startActivity(
                     Intent(this, SettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
+                MENU_CLEAR -> confirmClearConversation()
                 MENU_HIDE -> {
                     AppPrefs.bubbleEnabled = false
                     Toast.makeText(this, "Bulle masquée", Toast.LENGTH_SHORT).show()
@@ -385,6 +389,18 @@ class BubbleService : Service() {
         runCatching { popup.show() }.onFailure {
             Toast.makeText(this, "Menu momentanément indisponible.", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun confirmClearConversation() {
+        val themed = ContextThemeWrapper(this, R.style.Theme_BubbleClaw)
+        AlertDialog.Builder(themed)
+            .setMessage(getString(R.string.chat_clear_confirm))
+            .setNegativeButton(getString(R.string.chat_clear_no), null)
+            .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
+                ConversationStore.clear(this)
+                Toast.makeText(this, getString(R.string.chat_cleared), Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

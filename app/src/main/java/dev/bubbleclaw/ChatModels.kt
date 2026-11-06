@@ -23,7 +23,10 @@ data class ChatMessage(
     val toolCalls: List<ToolCall> = emptyList(),
     val toolCallId: String? = null,
     val isError: Boolean = false,
-    val isToolActivity: Boolean = false
+    val isToolActivity: Boolean = false,
+    val timestamp: Long = System.currentTimeMillis(),
+    val imagePath: String? = null,
+    val contextHeader: String? = null
 ) {
     fun toWireJson(): JSONObject {
         val json = JSONObject()
@@ -64,7 +67,18 @@ data class ChatMessage(
 
     companion object {
         fun system(text: String) = ChatMessage(role = "system", text = text)
-        fun user(text: String, image: String? = null) = ChatMessage(role = "user", text = text, imageDataUrl = image)
+        fun user(
+            text: String,
+            image: String? = null,
+            imagePath: String? = null,
+            contextHeader: String? = null
+        ) = ChatMessage(
+            role = "user",
+            text = text,
+            imageDataUrl = image,
+            imagePath = imagePath,
+            contextHeader = contextHeader
+        )
         fun assistant(text: String, calls: List<ToolCall> = emptyList()) =
             ChatMessage(role = "assistant", text = text, toolCalls = calls)
         fun tool(id: String, text: String) = ChatMessage(role = "tool", text = text, toolCallId = id)

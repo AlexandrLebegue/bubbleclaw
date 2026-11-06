@@ -122,6 +122,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         viewModel.setContext(contextInfo)
 
         findViewById<TextView>(R.id.close_button).setOnClickListener { finish() }
+        findViewById<ImageButton>(R.id.retake_context).setOnClickListener { captureContext() }
         sendButton.setOnClickListener { submit() }
         input.setOnEditorActionListener { _, actionId, event ->
             val enter = event != null &&
@@ -215,6 +216,68 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         if (text.isBlank() || viewModel.isStreaming) return
         input.setText("")
         viewModel.send(text)
+    }
+
+    private fun captureContext() {
+        val reader = ScreenReaderService.instance
+        if (reader == null) {
+            android.widget.Toast.makeText(
+                this,
+                getString(R.string.chat_context_unavailable),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        val button = findViewById<ImageButton>(R.id.retake_context)
+        button.isEnabled = false
+        reader.capture { capture ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                button.isEnabled = true
+                if (capture == null) {
+                    android.widget.Toast.makeText(
+                        this,
+                        getString(R.string.chat_context_unavailable),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    return@runOnUiThread
+                }
+                val directory = java.io.File(cacheDir, "captures").apply { mkdirs() }
+                val stamp = System.currentTimeMillis()
+                val imageFile = java.io.File(directory, "capture_$stamp.jpg")
+                val thumbFile = java.io.File(directory, "capture_${stamp}_thumb.jpg")
+                runCatching {
+                    imageFile.writeBytes(capture.jpeg)
+                    thumbFile.writeBytes(jpegOf(capture.thumbnail))
+                }
+                val info = ScreenContextInfo(
+                    appName = reader.foregroundAppName,
+                    page = reader.currentPageUrl(),
+                    windowTitle = reader.currentWindowTitle,
+                    time = SimpleDateFormat("HH:mm", Locale.FRANCE).format(Date()),
+                    imagePath = imageFile.takeIf { it.exists() }?.absolutePath,
+                    thumbPath = thumbFile.takeIf { it.exists() }?.absolutePath,
+                    width = capture.bitmap.width,
+                    height = capture.bitmap.height,
+                    visibleText = if (AppPrefs.includeVisibleText) reader.visibleTextDigest() else null,
+                    accessibilityMissing = false,
+                    appPackage = reader.foregroundAppPackage
+                )
+                viewModel.setPendingContext(info)
+                populateContext(info)
+                android.widget.Toast.makeText(
+                    this,
+                    getString(R.string.chat_context_attached),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun jpegOf(bitmap: android.graphics.Bitmap): ByteArray {
+        val stream = java.io.ByteArrayOutputStream()
+        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, stream)
+        return stream.toByteArray()
     }
 
     private fun render() {

@@ -167,6 +167,17 @@
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/clear_chat_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/chat_clear"
+            android:textAllCaps="false"
+            android:textColor="@color/danger"
+            app:backgroundTint="@color/panel_high"
+            app:cornerRadius="16dp" />
+
         <TextView
             style="@style/BubbleClaw.SectionTitle"
             android:layout_width="match_parent"
