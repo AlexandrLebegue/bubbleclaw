@@ -74,6 +74,18 @@ class SettingsActivity : AppCompatActivity() {
 
         bubbleButton = findViewById(R.id.bubble_button)
         bubbleButton.setOnClickListener { toggleBubble() }
+
+        findViewById<MaterialButton>(R.id.clear_chat_button).setOnClickListener {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setMessage(getString(R.string.chat_clear_confirm))
+                .setNegativeButton(getString(R.string.chat_clear_no), null)
+                .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
+                    ConversationStore.clear(this)
+                    Toast.makeText(this, getString(R.string.chat_cleared), Toast.LENGTH_SHORT)
+                        .show()
+                }
+                .show()
+        }
     }
 
     override fun onResume() {
