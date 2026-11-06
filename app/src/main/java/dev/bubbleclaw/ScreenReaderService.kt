@@ -233,8 +233,8 @@ class ScreenReaderService : AccessibilityService() {
             }
             if (focused.isEditable) {
                 focused.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                copyToClipboard(text)
                 if (focused.performAction(AccessibilityNodeInfo.ACTION_PASTE)) {
-                    copyToClipboard(text)
                     return "Texte collé dans le champ actif."
                 }
             }
