@@ -5,14 +5,18 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.text.Layout
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.StaticLayout
+import android.text.TextPaint
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.LeadingMarginSpan
 import android.text.style.LineBackgroundSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
+import android.text.style.ReplacementSpan
 import android.text.style.TypefaceSpan
 import android.text.style.URLSpan
 import androidx.core.content.ContextCompat
@@ -41,6 +45,7 @@ object MarkdownRenderer {
                     builder.setSpan(RelativeSizeSpan(scale), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 }
                 is MdBlock.CodeBlock -> appendCodeBlock(builder, block.code, density)
+                is MdBlock.Table -> appendTable(builder, block, context, density)
                 is MdBlock.BulletList -> {
                     block.items.forEach { item ->
                         val start = builder.length
@@ -133,6 +138,44 @@ object MarkdownRenderer {
         }
     }
 
+    private fun appendTable(
+        builder: SpannableStringBuilder,
+        block: MdBlock.Table,
+        context: Context,
+        density: Float
+    ) {
+        val start = builder.length
+        builder.append('\uFFFC')
+        val span = TableSpan(
+            headers = block.headers.map { inlineText(it) },
+            rows = block.rows.map { row -> row.map { inlineText(it) } },
+            maxWidth = (context.resources.displayMetrics.widthPixels * 0.78f).toInt(),
+            textColor = ContextCompat.getColor(context, R.color.text_primary),
+            headerColor = ContextCompat.getColor(context, R.color.coral_light),
+            borderColor = ContextCompat.getColor(context, R.color.panel_high),
+            headerBackground = ContextCompat.getColor(context, R.color.panel_high),
+            density = density
+        )
+        builder.setSpan(span, start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+
+    private fun inlineText(content: List<MdInline>): String {
+        val builder = StringBuilder()
+        fun append(items: List<MdInline>) {
+            for (item in items) {
+                when (item) {
+                    is MdInline.Text -> builder.append(item.text)
+                    is MdInline.Bold -> append(item.children)
+                    is MdInline.Italic -> append(item.children)
+                    is MdInline.Code -> builder.append(item.text)
+                    is MdInline.Link -> builder.append(item.label)
+                }
+            }
+        }
+        append(content)
+        return builder.toString()
+    }
+
     private fun appendCodeBlock(builder: SpannableStringBuilder, code: String, density: Float) {
         val start = builder.length
         builder.append(code)
@@ -157,6 +200,162 @@ object MarkdownRenderer {
             ds.color = color
             ds.isUnderlineText = false
         }
+    }
+
+    private class TableSpan(
+        private val headers: List<String>,
+        private val rows: List<List<String>>,
+        private val maxWidth: Int,
+        private val textColor: Int,
+        private val headerColor: Int,
+        private val borderColor: Int,
+        private val headerBackground: Int,
+        private val density: Float
+    ) : ReplacementSpan() {
+
+        private val horizontalPadding = (density * 8).toInt()
+        private val verticalPadding = (density * 6).toInt()
+        private val borderWidth = (density * 1).coerceAtLeast(1f)
+        private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = borderColor
+            style = Paint.Style.STROKE
+            strokeWidth = borderWidth
+        }
+        private val headerBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = headerBackground
+            style = Paint.Style.FILL
+        }
+
+        private var cachedWidth = 0
+        private var cachedHeight = 0
+        private var columnWidths: IntArray = IntArray(0)
+        private var rowHeights: IntArray = IntArray(0)
+        private var headerLayouts: List<StaticLayout> = emptyList()
+        private var rowLayouts: List<List<StaticLayout>> = emptyList()
+
+        override fun getSize(
+            paint: Paint,
+            text: CharSequence,
+            start: Int,
+            end: Int,
+            fm: Paint.FontMetricsInt?
+        ): Int {
+            compute(paint)
+            fm?.let {
+                it.ascent = -cachedHeight
+                it.descent = 0
+                it.top = -cachedHeight
+                it.bottom = 0
+            }
+            return cachedWidth
+        }
+
+        override fun draw(
+            canvas: Canvas,
+            text: CharSequence,
+            start: Int,
+            end: Int,
+            x: Float,
+            top: Int,
+            baseline: Int,
+            bottom: Int,
+            paint: Paint
+        ) {
+            if (columnWidths.isEmpty()) compute(paint)
+            val tableTop = top.toFloat()
+            var y = tableTop
+            canvas.drawRect(x, y, x + cachedWidth, y + rowHeights[0], headerBackgroundPaint)
+            drawRow(canvas, headerLayouts, columnWidths, x, y, rowHeights[0])
+            y += rowHeights[0]
+            rows.forEachIndexed { index, _ ->
+                drawRow(canvas, rowLayouts[index], columnWidths, x, y, rowHeights[index + 1])
+                y += rowHeights[index + 1]
+            }
+            drawBorders(canvas, x, tableTop)
+        }
+
+        private fun drawRow(
+            canvas: Canvas,
+            layouts: List<StaticLayout>,
+            widths: IntArray,
+            left: Float,
+            top: Float,
+            height: Int
+        ) {
+            var x = left
+            layouts.forEachIndexed { index, layout ->
+                val textTop = top + verticalPadding
+                canvas.save()
+                canvas.translate(x + horizontalPadding, textTop)
+                layout.draw(canvas)
+                canvas.restore()
+                x += widths[index]
+            }
+        }
+
+        private fun drawBorders(canvas: Canvas, left: Float, top: Float) {
+            var x = left
+            for (width in columnWidths) {
+                canvas.drawLine(x, top, x, top + cachedHeight, borderPaint)
+                x += width
+            }
+            canvas.drawLine(x, top, x, top + cachedHeight, borderPaint)
+            var y = top
+            for (height in rowHeights) {
+                canvas.drawLine(left, y, left + cachedWidth, y, borderPaint)
+                y += height
+            }
+            canvas.drawLine(left, y, left + cachedWidth, y, borderPaint)
+        }
+
+        private fun compute(paint: Paint) {
+            val columns = headers.size.coerceAtLeast(1)
+            val textPaint = TextPaint(paint).apply {
+                color = textColor
+                typeface = Typeface.DEFAULT
+            }
+            val headerPaint = TextPaint(paint).apply {
+                color = headerColor
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            val weights = IntArray(columns) { 1 }
+            for (column in 0 until columns) {
+                var longest = headers.getOrElse(column) { "" }.length
+                for (row in rows) {
+                    longest = maxOf(longest, row.getOrElse(column) { "" }.length)
+                }
+                weights[column] = longest.coerceIn(4, 60)
+            }
+            val totalWeight = weights.sum().coerceAtLeast(1)
+            val available = (maxWidth - borderWidth.toInt() * (columns + 1))
+                .coerceAtLeast(columns * 48)
+            columnWidths = IntArray(columns) { index ->
+                (available * weights[index] / totalWeight).coerceAtLeast(48)
+            }
+            headerLayouts = headers.mapIndexed { index, value ->
+                layout(value, headerPaint, columnWidths[index] - horizontalPadding * 2)
+            }
+            rowLayouts = rows.map { row ->
+                row.mapIndexed { index, value ->
+                    layout(value, textPaint, columnWidths[index] - horizontalPadding * 2)
+                }
+            }
+            val headerHeight = headerLayouts.maxOfOrNull { it.height } ?: 0
+            rowHeights = IntArray(rows.size + 1)
+            rowHeights[0] = headerHeight + verticalPadding * 2
+            rows.forEachIndexed { index, _ ->
+                val height = rowLayouts[index].maxOfOrNull { it.height } ?: 0
+                rowHeights[index + 1] = height + verticalPadding * 2
+            }
+            cachedWidth = columnWidths.sum().coerceAtLeast(1)
+            cachedHeight = rowHeights.sum()
+        }
+
+        private fun layout(value: String, paint: TextPaint, width: Int): StaticLayout =
+            StaticLayout.Builder.obtain(value, 0, value.length, paint, width.coerceAtLeast(1))
+                .setIncludePad(false)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .build()
     }
 
     private class CodeBlockSpan(

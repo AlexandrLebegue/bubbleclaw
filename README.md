@@ -44,7 +44,8 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   renderer maison, tolérants au markdown partiel du streaming ; les messages
   utilisateur restent en texte simple. Les liens `[libellé](url)`, les URLs
   nues et les autolinks `<https://…>` / `www.…` sont cliquables et colorés en
-  corail.
+  corail. Les tableaux GFM (`| col | col |` + ligne `|---|`) sont détectés et
+  rendus en grille dessinée avec cellules, en-tête et séparateurs.
 - **Animation d'ouverture** : la bulle s'enfonce (0.86, 90 ms), glisse en haut
   au centre du téléphone (220 ms), puis le panneau se déploie depuis le centre
   de la bulle (0.85 → 1.0, fondu 180 ms). À chaque tap, le homard plisse les
@@ -168,7 +169,7 @@ Ouvrir l'app → **Réglages** (ou appui long sur la bulle → Réglages).
 | URL du gateway | `http://192.168.1.57:18789/v1` | Base HTTP. Avec ou sans `/v1` : BubbleClaw ajoute `/v1` seulement s'il manque. |
 | Jeton | vide | Envoyé en `Authorization: Bearer …`. |
 | Modèle | `openclaw/boss` | Champ `model` de la requête, inchangé. |
-| Modèle backend | `hyperqwen/qwen3.8-27b` | Transmis dans l'en-tête `x-openclaw-model` quand il est non vide ; c'est lui que le gateway utilise pour choisir le modèle backend. |
+| Modèle backend | `hyperqwen/qwen3.8-27b` | Toujours transmis dans l'en-tête `x-openclaw-model` ; une valeur vide est remplacée par ce défaut. Le champ `model` reste `openclaw/boss`. |
 | Session | `android:bubbleclaw` | Champ `user`, stable entre les lancements. |
 
 Interrupteurs :

@@ -44,6 +44,37 @@ class MarkdownParserTest {
     }
 
     @Test
+    fun parsesMarkdownTableIntoStructuredBlock() {
+        val blocks = MarkdownParser.parse(
+            "| Service | Rôle | État |\n" +
+                "|---|---|---|\n" +
+                "| `nvidia-powerlimit` | one-shot | enabled |\n" +
+                "| gpumon | log CSV | enabled |"
+        )
+        val table = blocks.filterIsInstance<MdBlock.Table>().single()
+        assertEquals(3, table.headers.size)
+        assertEquals(2, table.rows.size)
+        assertEquals("Service", (table.headers[0].single() as MdInline.Text).text)
+        assertEquals("nvidia-powerlimit", (table.rows[0][0].single() as MdInline.Code).text)
+        assertEquals("gpumon", (table.rows[1][0].single() as MdInline.Text).text)
+    }
+
+    @Test
+    fun tableRowsArePaddedAndTruncatedToHeaderWidth() {
+        val blocks = MarkdownParser.parse(
+            "A | B\n" +
+                "--- | ---\n" +
+                "1 |\n" +
+                "1 | 2 | 3"
+        )
+        val table = blocks.filterIsInstance<MdBlock.Table>().single()
+        assertEquals(2, table.rows.size)
+        assertEquals(2, table.rows[0].size)
+        assertEquals(2, table.rows[1].size)
+        assertEquals("2", (table.rows[1][1].single() as MdInline.Text).text)
+    }
+
+    @Test
     fun angleBracketUrlBecomesClickableLink() {
         val inline = firstParagraph("<https://www.amazon.fr/ETOPARS-Voiture-Autocollant-Protection-Véhicule/dp/B0D7LQ8JZP>")
         val link = inline.filterIsInstance<MdInline.Link>().single()
