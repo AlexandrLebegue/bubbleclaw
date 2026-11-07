@@ -25,7 +25,7 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   nom, page et vignette 36 dp. Toute la ligne ouvre la capture en plein écran.
 - **Panneau de discussion flottant** : la fenêtre de chat est translucide et
   laisse voir l'application courante ; seule la carte du panneau est opaque
-  (`#FF1B1518`, largeur 92 % plafonnée à 420 dp, hauteur maximale 52 % de la
+  (`#FF1B1518`, largeur 92 % plafonnée à 420 dp, hauteur maximale 50 % de la
   zone utile, coins arrondis 24 dp, bordure corail, ombre). Marge de 16 dp sur
   les côtés. À l'ouverture, la bulle se déplace en haut au centre et le panneau
   s'ouvre juste en dessous. Un tap hors du panneau le ferme.
