@@ -44,16 +44,19 @@ class SettingsActivity : AppCompatActivity() {
         val baseUrl = findViewById<EditText>(R.id.base_url)
         val token = findViewById<EditText>(R.id.token)
         val model = findViewById<EditText>(R.id.model)
+        val backendModel = findViewById<EditText>(R.id.backend_model)
         val session = findViewById<EditText>(R.id.session)
 
         baseUrl.setText(AppPrefs.baseUrl)
         token.setText(AppPrefs.token)
         model.setText(AppPrefs.model)
+        backendModel.setText(AppPrefs.backendModel)
         session.setText(AppPrefs.sessionId)
 
         baseUrl.doAfterTextChanged { AppPrefs.baseUrl = it?.toString().orEmpty() }
         token.doAfterTextChanged { AppPrefs.token = it?.toString().orEmpty() }
         model.doAfterTextChanged { AppPrefs.model = it?.toString().orEmpty() }
+        backendModel.doAfterTextChanged { AppPrefs.backendModel = it?.toString().orEmpty() }
         session.doAfterTextChanged { AppPrefs.sessionId = it?.toString().orEmpty() }
 
         val autoScreenshot = findViewById<SwitchMaterial>(R.id.switch_auto_screenshot)

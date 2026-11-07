@@ -54,7 +54,8 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   est tenu par `BubbleService`, renseigné par `ChatActivity` à la création et
   libéré à la destruction (rotation, retour arrière, fermeture par tap
   extérieur), donc une activité morte ne bloque jamais la bulle.
-- **Chat en streaming SSE** vers `chat/completions`, avec repli automatique en
+- **Chat en streaming SSE** vers `chat/completions`, avec `x-openclaw-model`
+  pour sélectionner le modèle backend du gateway, et repli automatique en
   non-streaming, messages d'erreur en français et bouton « Réessayer ». Pendant
   une réponse, le bouton d'envoi devient « Annuler la réponse » : il coupe la
   connexion en cours, efface le texte partiel et rend la main immédiatement.
@@ -78,8 +79,10 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   `filesDir/conversations/<id>.json` (écriture atomique), avec son titre, sa
   date et son identifiant de session. Le titre de la conversation est cliquable
   dans l'en-tête pour ouvrir une carte de sélection custom (lignes avec titre,
-  date, coche de conversation active) ; le bouton `+` lance une nouvelle
-  conversation. Le sélecteur permet de basculer sans perdre le fil courant.
+  date, coche de conversation active, bouton supprimer avec confirmation) ; le
+  bouton `+` lance une nouvelle conversation. Le sélecteur permet de basculer
+  sans perdre le fil courant ; supprimer la conversation active bascule
+  automatiquement sur la plus récente, ou en crée une vide s'il n'en reste plus.
 - **Session par conversation** : chaque conversation garde son propre champ
   `user` côté gateway, donc deux fils ne se mélangent pas. Le bouton
   « Effacer la conversation » réinitialise le fil actif et sa session.
@@ -155,7 +158,8 @@ Ouvrir l'app → **Réglages** (ou appui long sur la bulle → Réglages).
 |---|---|---|
 | URL du gateway | `http://adresse-du-gateway:18789/v1` | Base HTTP. Avec ou sans `/v1` : BubbleClaw ajoute `/v1` seulement s'il manque. |
 | Jeton | vide | Envoyé en `Authorization: Bearer …`. |
-| Modèle | `openclaw/boss` | Champ `model` de la requête. |
+| Modèle | `openclaw/boss` | Champ `model` de la requête, inchangé. |
+| Modèle backend | `hyperqwen/qwen3.8-27b` | Transmis dans l'en-tête `x-openclaw-model` quand il est non vide ; c'est lui que le gateway utilise pour choisir le modèle backend. |
 | Session | `android:bubbleclaw` | Champ `user`, stable entre les lancements. |
 
 Interrupteurs :

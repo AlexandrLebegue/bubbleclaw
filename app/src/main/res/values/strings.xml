@@ -45,12 +45,19 @@
     <string name="chat_attachment_failed">Impossible de joindre ce fichier.</string>
     <string name="chat_conversation_new">Nouvelle conversation</string>
     <string name="chat_conversation_close">Fermer</string>
+    <string name="chat_delete_conversation">Supprimer la conversation</string>
+    <string name="chat_delete_conversation_named">Supprimer %1$s</string>
+    <string name="chat_delete_confirm">Supprimer cette conversation ?</string>
+    <string name="chat_delete_yes">Supprimer</string>
+    <string name="chat_delete_no">Annuler</string>
 
     <string name="settings_title">Réglages</string>
     <string name="settings_gateway">Gateway OpenClaw</string>
     <string name="settings_base_url">URL du gateway</string>
     <string name="settings_token">Jeton</string>
     <string name="settings_model">Modèle</string>
+    <string name="settings_backend_model">Modèle backend</string>
+    <string name="settings_backend_model_body">Transmis au gateway dans l\'en-tête x-openclaw-model. Le champ model de la requête reste openclaw/boss : ce réglage choisit seulement le modèle backend.</string>
     <string name="settings_session">Session</string>
     <string name="settings_test">Tester la connexion</string>
     <string name="settings_testing">Test en cours…</string>

@@ -112,6 +112,13 @@ object ConversationStore {
         return meta
     }
 
+    fun delete(context: Context, id: String) {
+        synchronized(lock) {
+            runCatching { file(context, id).delete() }
+            runCatching { imageDirectory(context, id).deleteRecursively() }
+        }
+    }
+
     fun clearActive(context: Context, baseSessionId: String) {
         val id = AppPrefs.activeConversationId
         if (id.isNotBlank()) reset(context, id, baseSessionId)

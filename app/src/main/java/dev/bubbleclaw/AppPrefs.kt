@@ -33,6 +33,10 @@ object AppPrefs {
         get() = prefs.getString("model", "openclaw/boss")!!
         set(value) = prefs.edit().putString("model", value.trim()).apply()
 
+    var backendModel: String
+        get() = prefs.getString("backendModel", "hyperqwen/qwen3.8-27b")!!
+        set(value) = prefs.edit().putString("backendModel", value.trim()).apply()
+
     var sessionId: String
         get() = prefs.getString("sessionId", "android:bubbleclaw")!!
         set(value) = prefs.edit().putString("sessionId", value.trim()).apply()

@@ -164,6 +164,34 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         notifyChanged()
     }
 
+    fun deleteConversation(id: String): Boolean {
+        val exists = ConversationStore.list(appContext).any { it.id == id }
+        if (!exists) return false
+        Diag.log("conversation deleted")
+        if (id != activeId) {
+            ConversationStore.delete(appContext, id)
+            return true
+        }
+        generation++
+        activeClient?.cancel()
+        ConversationStore.delete(appContext, id)
+        val next = ConversationStore.list(appContext).firstOrNull()
+        if (next == null) {
+            val meta = ConversationStore.create(appContext, AppPrefs.sessionId)
+            activate(meta, emptyList())
+        } else {
+            val loaded = ConversationStore.load(appContext, next.id)
+            val title = if (next.title == ConversationStore.defaultTitle()) {
+                ConversationStore.titleFor(loaded)
+            } else {
+                next.title
+            }
+            activate(next.copy(title = title), loaded)
+        }
+        notifyChanged()
+        return true
+    }
+
     private fun activate(meta: ConversationStore.ConversationMeta, loaded: List<ChatMessage>) {
         activeId = meta.id
         activeSession = meta.sessionId
