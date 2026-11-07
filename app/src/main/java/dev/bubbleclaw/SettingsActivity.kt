@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.EditText
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -80,6 +81,14 @@ class SettingsActivity : AppCompatActivity() {
         stream.setOnCheckedChangeListener { _, checked -> AppPrefs.streamEnabled = checked }
         crashReports.setOnCheckedChangeListener { _, checked -> AppPrefs.crashReportsEnabled = checked }
 
+        val sendScreenshot = findViewById<RadioGroup>(R.id.send_screenshot_group)
+        sendScreenshot.check(
+            if (AppPrefs.sendScreenshot) R.id.send_screenshot_yes else R.id.send_screenshot_no
+        )
+        sendScreenshot.setOnCheckedChangeListener { _, checkedId ->
+            AppPrefs.sendScreenshot = checkedId == R.id.send_screenshot_yes
+        }
+
         testResult = findViewById(R.id.test_result)
         testButton = findViewById(R.id.test_button)
         testButton.setOnClickListener { testConnection() }
@@ -91,17 +100,23 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, DiagnosticActivity::class.java))
         }
 
-        findViewById<MaterialButton>(R.id.clear_chat_button).setOnClickListener {
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setMessage(getString(R.string.chat_clear_confirm))
-                .setNegativeButton(getString(R.string.chat_clear_no), null)
-                .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
-                    ConversationStore.clear(this)
-                    BubbleService.clearChatIfOpen()
-                    Toast.makeText(this, getString(R.string.chat_cleared), Toast.LENGTH_SHORT)
-                        .show()
-                }
-                .show()
+        findViewById<MaterialButton>(R.id.clear_chat_button).apply {
+            setText(R.string.chat_clear_all)
+            setOnClickListener {
+                androidx.appcompat.app.AlertDialog.Builder(this@SettingsActivity)
+                    .setMessage(getString(R.string.chat_clear_all_confirm))
+                    .setNegativeButton(getString(R.string.chat_clear_no), null)
+                    .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
+                        ConversationStore.clearAll(this@SettingsActivity)
+                        BubbleService.clearChatIfOpen()
+                        Toast.makeText(
+                            this@SettingsActivity,
+                            getString(R.string.chat_cleared),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    .show()
+            }
         }
     }
 

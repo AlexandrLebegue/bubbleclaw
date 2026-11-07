@@ -27,11 +27,18 @@
     <string name="chat_context_unavailable">Capture impossible : active le service d\'accessibilité.</string>
     <string name="chat_empty_welcome">Touche la bulle, je regarde ton écran et on discute.</string>
     <string name="chat_clear">Effacer la conversation</string>
+    <string name="chat_clear_all">Effacer toutes les conversations</string>
     <string name="chat_clear_confirm">Effacer toute la conversation ?</string>
+    <string name="chat_clear_all_confirm">Effacer toutes les conversations ?</string>
     <string name="chat_clear_yes">Effacer</string>
     <string name="chat_clear_no">Annuler</string>
     <string name="chat_cleared">Conversation effacée</string>
     <string name="chat_message_copied">Message copié.</string>
+    <string name="chat_conversations">Conversations</string>
+    <string name="chat_new_conversation">Nouvelle conversation</string>
+    <string name="chat_choose_conversation">Choisir une conversation</string>
+    <string name="chat_new_conversation_action">Nouvelle</string>
+    <string name="chat_active_conversation">Conversation active</string>
 
     <string name="settings_title">Réglages</string>
     <string name="settings_gateway">Gateway OpenClaw</string>
@@ -56,6 +63,10 @@
     <string name="settings_include_text">Inclure le texte visible dans le contexte</string>
     <string name="settings_control">Mode contrôle (l\'agent peut agir)</string>
     <string name="settings_stream">Réponses en streaming</string>
+    <string name="settings_send_screenshot">Envoyer la capture d\'écran</string>
+    <string name="settings_send_screenshot_body">Désactivé par défaut : la capture reste locale pour la vignette et n\'est jamais jointe aux messages.</string>
+    <string name="settings_no">Non</string>
+    <string name="settings_yes">Oui</string>
     <string name="settings_crash_reports">Envoyer les rapports de crash</string>
     <string name="settings_crash_reports_body">La trace part uniquement vers l\'URL du gateway configuré, jamais ailleurs. Si tu désactives ce réglage, seul le fichier local est écrit.</string>
     <string name="settings_saved">Réglages enregistrés</string>

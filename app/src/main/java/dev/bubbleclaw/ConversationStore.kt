@@ -6,25 +6,47 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Persists the chat thread as JSON in filesDir. Images are kept as file paths inside
- * cacheDir and never as base64 inside the JSON.
+ * Persists chat threads as one JSON file per conversation in filesDir/conversations.
+ * Images are kept as file paths inside a per-conversation cache directory, never as
+ * base64 inside the JSON.
  */
 object ConversationStore {
 
-    private const val FILE_NAME = "conversation.json"
-    private const val IMAGE_DIR = "conversation"
-
+    private const val DIR_NAME = "conversations"
+    private const val LEGACY_FILE = "conversation.json"
+    private const val DEFAULT_TITLE = "Nouvelle conversation"
     private val lock = Any()
 
-    fun file(context: Context): File = File(context.filesDir, FILE_NAME)
+    data class ConversationMeta(
+        val id: String,
+        val title: String,
+        val updatedAt: Long,
+        val sessionId: String
+    )
 
-    fun imageDirectory(context: Context): File =
-        File(context.cacheDir, IMAGE_DIR).apply { mkdirs() }
+    fun defaultTitle(): String = DEFAULT_TITLE
 
-    fun load(context: Context): List<ChatMessage> {
-        val target = file(context)
-        if (!target.exists()) return emptyList()
-        return synchronized(lock) {
+    fun directory(context: Context): File = File(context.filesDir, DIR_NAME).apply { mkdirs() }
+
+    fun file(context: Context, id: String): File = File(directory(context), "$id.json")
+
+    private fun imagesRoot(context: Context): File =
+        File(context.cacheDir, "conversation").apply { mkdirs() }
+
+    fun imageDirectory(context: Context, id: String): File =
+        File(imagesRoot(context), id).apply { mkdirs() }
+
+    fun list(context: Context): List<ConversationMeta> {
+        synchronized(lock) {
+            migrateLegacy(context)
+            return scan(context)
+        }
+    }
+
+    fun load(context: Context, id: String): List<ChatMessage> {
+        synchronized(lock) {
+            val target = file(context, id)
+            if (!target.exists()) return emptyList()
             val messages = runCatching {
                 val root = JSONObject(target.readText())
                 val array = root.optJSONArray("messages") ?: JSONArray()
@@ -35,57 +57,143 @@ object ConversationStore {
                 }
                 result
             }.getOrDefault(emptyList())
-            cleanupOrphans(context, messages)
-            messages
+            cleanupOrphans(context, id, messages)
+            return messages
         }
     }
 
-    fun save(context: Context, messages: List<ChatMessage>) {
+    fun save(context: Context, meta: ConversationMeta, messages: List<ChatMessage>) {
         synchronized(lock) {
             runCatching {
                 val array = JSONArray()
                 for (message in messages) array.put(toJson(message))
                 val root = JSONObject()
-                    .put("version", 1)
+                    .put("version", 2)
+                    .put("id", meta.id)
+                    .put("title", meta.title)
+                    .put("sessionId", meta.sessionId)
+                    .put("updatedAt", meta.updatedAt)
                     .put("messages", array)
-                val target = file(context)
-                val temp = File(target.parentFile, "$FILE_NAME.tmp")
+                val target = file(context, meta.id)
+                val temp = File(target.parentFile, "${target.name}.tmp")
                 temp.writeText(root.toString())
                 if (!temp.renameTo(target)) {
                     target.delete()
                     if (!temp.renameTo(target)) temp.delete()
                 }
-                cleanupOrphans(context, messages)
+                cleanupOrphans(context, meta.id, messages)
             }
         }
     }
 
-    fun clear(context: Context) {
+    fun create(context: Context, baseSessionId: String): ConversationMeta {
+        val stamp = System.currentTimeMillis()
+        val id = "c$stamp"
+        val meta = ConversationMeta(
+            id = id,
+            title = DEFAULT_TITLE,
+            updatedAt = stamp,
+            sessionId = sessionFor(baseSessionId, id)
+        )
+        save(context, meta, emptyList())
+        return meta
+    }
+
+    /** Empties a conversation and gives it a fresh gateway session. */
+    fun reset(context: Context, id: String, baseSessionId: String): ConversationMeta? {
+        val current = synchronized(lock) { metaOf(file(context, id)) } ?: return null
+        val meta = current.copy(
+            title = DEFAULT_TITLE,
+            updatedAt = System.currentTimeMillis(),
+            sessionId = sessionFor(baseSessionId, id)
+        )
+        save(context, meta, emptyList())
+        runCatching { imageDirectory(context, id).deleteRecursively() }
+        return meta
+    }
+
+    fun clearActive(context: Context, baseSessionId: String) {
+        val id = AppPrefs.activeConversationId
+        if (id.isNotBlank()) reset(context, id, baseSessionId)
+    }
+
+    fun clearAll(context: Context) {
         synchronized(lock) {
-            runCatching { file(context).delete() }
-            runCatching {
-                imageDirectory(context).listFiles()?.forEach { it.delete() }
-            }
+            runCatching { directory(context).listFiles()?.forEach { it.delete() } }
+            runCatching { imagesRoot(context).deleteRecursively() }
+            runCatching { File(context.filesDir, LEGACY_FILE).delete() }
         }
     }
 
     /** Copies a capture into the conversation cache so capture pruning cannot break history. */
-    fun attachImage(context: Context, sourcePath: String?): String? {
+    fun attachImage(context: Context, conversationId: String, sourcePath: String?): String? {
         if (sourcePath.isNullOrBlank()) return null
         val source = File(sourcePath)
         if (!source.exists()) return null
         return runCatching {
-            val directory = imageDirectory(context)
+            val directory = imageDirectory(context, conversationId)
             val target = File(directory, "ctx_${System.currentTimeMillis()}.jpg")
             source.copyTo(target, overwrite = true)
             target.absolutePath
         }.getOrNull()
     }
 
-    private fun cleanupOrphans(context: Context, messages: List<ChatMessage>) {
+    fun sessionFor(baseSessionId: String, conversationId: String): String =
+        "$baseSessionId:${conversationId.takeLast(8)}"
+
+    private fun scan(context: Context): List<ConversationMeta> =
+        directory(context).listFiles { file -> file.isFile && file.extension == "json" }
+            ?.mapNotNull { metaOf(it) }
+            ?.sortedByDescending { it.updatedAt }
+            .orEmpty()
+
+    private fun metaOf(file: File): ConversationMeta? = runCatching {
+        val root = JSONObject(file.readText())
+        ConversationMeta(
+            id = root.optString("id").ifBlank { file.nameWithoutExtension },
+            title = root.optString("title").ifBlank { DEFAULT_TITLE },
+            updatedAt = root.optLong("updatedAt", file.lastModified()),
+            sessionId = root.optString("sessionId").ifBlank { AppPrefs.sessionId }
+        )
+    }.getOrNull()
+
+    private fun migrateLegacy(context: Context) {
+        val legacy = File(context.filesDir, LEGACY_FILE)
+        if (!legacy.exists()) return
+        runCatching {
+            val root = JSONObject(legacy.readText())
+            val array = root.optJSONArray("messages") ?: JSONArray()
+            val messages = ArrayList<ChatMessage>(array.length())
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                messages.add(fromJson(item))
+            }
+            val id = "legacy"
+            val meta = ConversationMeta(
+                id = id,
+                title = titleFor(messages),
+                updatedAt = legacy.lastModified(),
+                sessionId = AppPrefs.sessionId
+            )
+            save(context, meta, messages)
+            legacy.delete()
+            if (AppPrefs.activeConversationId.isBlank()) {
+                AppPrefs.activeConversationId = id
+            }
+        }
+    }
+
+    fun titleFor(messages: List<ChatMessage>): String {
+        val first = messages.firstOrNull {
+            it.role == "user" && !it.isToolActivity && !it.isError && it.text.isNotBlank()
+        }?.text ?: return DEFAULT_TITLE
+        return first.trim().replace(Regex("\\s+"), " ").take(38).ifBlank { DEFAULT_TITLE }
+    }
+
+    private fun cleanupOrphans(context: Context, id: String, messages: List<ChatMessage>) {
         val referenced = messages.mapNotNull { it.imagePath }.toSet()
         runCatching {
-            imageDirectory(context).listFiles()
+            imageDirectory(context, id).listFiles()
                 ?.filter { it.absolutePath !in referenced }
                 ?.forEach { it.delete() }
         }
