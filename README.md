@@ -27,11 +27,11 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   quand l'app est un navigateur connu, titre de fenêtre sinon, texte visible en
   option. La carte de contexte est une seule ligne compacte : icône de l'app,
   nom, page et vignette 36 dp. Toute la ligne ouvre la capture en plein écran.
-- **Panneau de discussion flottant** : la fenêtre de chat est translucide et
-  laisse voir l'application courante ; seule la carte du panneau est opaque
-  (`#FF1B1518`, largeur 92 % plafonnée à 420 dp, hauteur maximale 80 % de la
-  zone utile, coins arrondis 24 dp, bordure corail, ombre). Marge de 16 dp sur
-  les côtés. À l'ouverture, la bulle se déplace en haut au centre et le panneau
+- **Panneau de discussion flottant** : la fenêtre de chat est translucide avec
+  un léger voile sombre (`#66000000`) pour détacher la discussion de l'app
+  derrière ; seule la carte du panneau est opaque (`#FF1B1518`, largeur 92 %
+  plafonnée à 420 dp, hauteur maximale 80 % de la zone utile, coins arrondis
+  24 dp, bordure corail, ombre). Marge de 16 dp sur les côtés. À l'ouverture, la bulle se déplace en haut au centre et le panneau
   s'ouvre juste en dessous. Un tap hors du panneau le ferme.
 - **Ouverture immédiate** : le panneau s'affiche au tap avec un squelette
   « Capture de l'écran… » et un shimmer, puis la carte se remplit quand la
