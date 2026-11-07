@@ -701,7 +701,10 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         }
         val available = root.height - root.paddingTop - root.paddingBottom
         if (available <= 0) return
-        val maxPanel = (available * 0.52f).toInt()
+        val maxPanel = minOf(
+            (available * 0.50f).toInt(),
+            (available - dp(88) - dp(16)).coerceAtLeast(dp(120))
+        )
         val contextHeight = if (contextCard.visibility == View.VISIBLE) contextCard.measuredHeight else 0
         val fixed = headerRow.measuredHeight + contextHeight + inputRow.measuredHeight
         val maxScroll = (maxPanel - fixed).coerceAtLeast(dp(120))
