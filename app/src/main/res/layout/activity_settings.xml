@@ -95,6 +95,27 @@
             android:textColorHint="@color/text_secondary"
             android:textSize="14sp" />
 
+        <TextView style="@style/BubbleClaw.Body" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="@string/settings_backend_model" />
+        <EditText
+            android:id="@+id/backend_model"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_input"
+            android:hint="hyperqwen/qwen3.8-27b"
+            android:inputType="text"
+            android:padding="14dp"
+            android:singleLine="true"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:textSize="14sp" />
+        <TextView
+            style="@style/BubbleClaw.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/settings_backend_model_body" />
+
         <TextView style="@style/BubbleClaw.Body" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="@string/settings_session" />
         <EditText
             android:id="@+id/session"

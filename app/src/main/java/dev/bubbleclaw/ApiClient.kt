@@ -22,7 +22,8 @@ class ApiClient(
     private val token: String,
     private val model: String,
     private val sessionId: String,
-    private val streamEnabled: Boolean = true
+    private val streamEnabled: Boolean = true,
+    private val backendModel: String = ""
 ) {
     private val root = baseUrl.trim().trimEnd('/')
     private val apiRoot = if (root.endsWith("/v1")) root else "$root/v1"
@@ -63,7 +64,8 @@ class ApiClient(
             AppPrefs.token,
             AppPrefs.model,
             sessionId,
-            AppPrefs.streamEnabled
+            AppPrefs.streamEnabled,
+            AppPrefs.backendModel
         )
     }
 
@@ -249,6 +251,7 @@ class ApiClient(
         connection.setRequestProperty("Accept", accept)
         connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         if (token.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
+        if (backendModel.isNotBlank()) connection.setRequestProperty("x-openclaw-model", backendModel)
         activeConnection = connection
         return connection
     }

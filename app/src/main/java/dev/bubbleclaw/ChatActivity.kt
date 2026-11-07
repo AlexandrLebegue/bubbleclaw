@@ -24,6 +24,7 @@ import android.widget.TextView
 import android.widget.Toast
 import android.text.method.LinkMovementMethod
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -580,6 +581,32 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
                 }
             )
             row.addView(labels)
+            row.addView(
+                ImageButton(this).apply {
+                    setImageResource(R.drawable.ic_delete)
+                    imageTintList = android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(this@ChatActivity, R.color.text_secondary)
+                    )
+                    setBackgroundResource(selectableItemBackground())
+                    contentDescription = getString(
+                        R.string.chat_delete_conversation_named,
+                        conversation.title
+                    )
+                    layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+                    setPadding(dp(10), dp(10), dp(10), dp(10))
+                    setOnClickListener {
+                        AlertDialog.Builder(this@ChatActivity)
+                            .setMessage(R.string.chat_delete_confirm)
+                            .setNegativeButton(R.string.chat_delete_no, null)
+                            .setPositiveButton(R.string.chat_delete_yes) { _, _ ->
+                                viewModel.deleteConversation(conversation.id)
+                                dialog.dismiss()
+                                showConversationPicker()
+                            }
+                            .show()
+                    }
+                }
+            )
             row.setOnClickListener {
                 viewModel.switchConversation(conversation.id)
                 dialog.dismiss()
