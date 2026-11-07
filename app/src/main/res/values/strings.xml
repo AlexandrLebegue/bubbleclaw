@@ -71,6 +71,11 @@
     <string name="settings_stream">Réponses en streaming</string>
     <string name="settings_bubble_size">Taille de la bulle</string>
     <string name="settings_bubble_size_value">%1$d dp</string>
+    <string name="settings_bubble_skin">Skin de la bulle</string>
+    <string name="skin_lobster">Homard</string>
+    <string name="skin_paperclip">Trombone</string>
+    <string name="skin_panda">Panda</string>
+    <string name="skin_dog">Chien</string>
     <string name="settings_crash_reports">Envoyer les rapports de crash</string>
     <string name="settings_crash_reports_body">La trace part uniquement vers l\'URL du gateway configuré, jamais ailleurs. Si tu désactives ce réglage, seul le fichier local est écrit.</string>
     <string name="settings_saved">Réglages enregistrés</string>

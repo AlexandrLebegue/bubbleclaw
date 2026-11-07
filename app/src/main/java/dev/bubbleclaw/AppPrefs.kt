@@ -61,6 +61,10 @@ object AppPrefs {
         get() = prefs.getBoolean("crashReportsEnabled", true)
         set(value) = prefs.edit().putBoolean("crashReportsEnabled", value).apply()
 
+    var bubbleSkin: BubbleSkin
+        get() = BubbleSkin.fromName(prefs.getString("bubbleSkin", BubbleSkin.Lobster.name))
+        set(value) = prefs.edit().putString("bubbleSkin", value.name).apply()
+
     var bubbleSizeDp: Int
         get() = prefs.getInt("bubbleSizeDp", BUBBLE_SIZE_DEFAULT_DP)
             .coerceIn(BUBBLE_SIZE_MIN_DP, BUBBLE_SIZE_MAX_DP)

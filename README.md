@@ -17,6 +17,9 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   le plus proche et mémorise sa position verticale et son côté (gauche/droite),
   y compris après rotation. Si elle était active au redémarrage, `BootReceiver`
   la relance après un reboot.
+- **Skins de bulle** : homard (défaut), trombone façon Clippy, panda et chien.
+  Le choix se fait dans les réglages avec un aperçu animé de chaque skin et
+  s'applique immédiatement à la bulle flottante.
 - **Capture d'écran sans popup MediaProjection** via l'API Accessibility
   (`takeScreenshot`, Android 11+), image réduite à 1080 px de large, JPEG q70,
   plus une vignette 320 px.
@@ -165,6 +168,8 @@ Interrupteurs :
 - **Réponses en streaming** (on) : désactivable pour forcer le mode non-stream.
 - **Taille de la bulle** (48 dp) : slider de 32 à 72 dp, appliqué immédiatement
   si le service tourne.
+- **Skin de la bulle** : homard, trombone, panda ou chien ; aperçu direct et
+  application immédiate.
 - **Envoyer les rapports de crash** (on) : la trace part uniquement vers l'URL
   du gateway configuré, jamais ailleurs. Désactivé, seul le fichier local
   `filesDir/crash-*.txt` est écrit.

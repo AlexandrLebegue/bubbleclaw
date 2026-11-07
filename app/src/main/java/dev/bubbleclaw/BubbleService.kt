@@ -130,6 +130,10 @@ class BubbleService : Service() {
             instance?.resizeBubble()
         }
 
+        fun refreshBubbleSkin() {
+            instance?.applyBubbleSkin()
+        }
+
         fun restoreBubble(restorePosition: Boolean = true) {
             instance?.animateBubbleRestore()
             if (restorePosition) instance?.restoreChatBubblePosition()
@@ -289,6 +293,7 @@ class BubbleService : Service() {
         val height = metrics.heightPixels
 
         val view = LobsterBubbleView(this).apply {
+            skin = AppPrefs.bubbleSkin
             contentDescription = getString(R.string.bubble_description_open)
         }
         val layout = WindowManager.LayoutParams(
@@ -359,6 +364,10 @@ class BubbleService : Service() {
     private fun updateLayout(layout: WindowManager.LayoutParams) {
         val view = bubbleView ?: return
         runCatching { windowManager?.updateViewLayout(view, layout) }
+    }
+
+    private fun applyBubbleSkin() {
+        bubbleView?.skin = AppPrefs.bubbleSkin
     }
 
     private fun resizeBubble() {
