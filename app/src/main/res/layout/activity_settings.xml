@@ -168,6 +168,43 @@
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
 
+        <TextView
+            style="@style/BubbleClaw.SectionTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/settings_send_screenshot"
+            android:textSize="14sp" />
+
+        <RadioGroup
+            android:id="@+id/send_screenshot_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.radiobutton.MaterialRadioButton
+                android:id="@+id/send_screenshot_no"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/settings_no"
+                android:textColor="@color/text_primary" />
+
+            <com.google.android.material.radiobutton.MaterialRadioButton
+                android:id="@+id/send_screenshot_yes"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:text="@string/settings_yes"
+                android:textColor="@color/text_primary" />
+        </RadioGroup>
+
+        <TextView
+            style="@style/BubbleClaw.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="@string/settings_send_screenshot_body" />
+
         <com.google.android.material.switchmaterial.SwitchMaterial
             android:id="@+id/switch_crash_reports"
             android:layout_width="match_parent"

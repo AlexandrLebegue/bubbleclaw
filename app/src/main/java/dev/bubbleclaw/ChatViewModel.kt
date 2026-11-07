@@ -29,6 +29,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val main = Handler(Looper.getMainLooper())
     private val imageCache = HashMap<String, String>()
 
+    private var activeId: String = ""
+    private var activeSession: String = AppPrefs.sessionId
+    private var conversationTitle: String = ConversationStore.defaultTitle()
+
     @Volatile
     private var activeClient: ApiClient? = null
 
@@ -57,12 +61,28 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var lastQuestion: String? = null
 
     init {
-        val loaded = ConversationStore.load(appContext)
+        val metas = ConversationStore.list(appContext)
+        val savedId = AppPrefs.activeConversationId
+        val active = metas.firstOrNull { it.id == savedId }
+            ?: metas.firstOrNull()
+            ?: ConversationStore.create(appContext, AppPrefs.sessionId)
+        activeId = active.id
+        activeSession = active.sessionId
+        conversationTitle = active.title
+        AppPrefs.activeConversationId = activeId
+        val loaded = ConversationStore.load(appContext, activeId)
         synchronized(lock) {
             messageList.addAll(loaded)
             lastQuestion = loaded.lastOrNull {
                 it.role == "user" && !it.isToolActivity && !it.isError
             }?.text
+        }
+        if (conversationTitle == ConversationStore.defaultTitle()) {
+            val derived = ConversationStore.titleFor(loaded)
+            if (derived != conversationTitle) {
+                conversationTitle = derived
+                persist()
+            }
         }
     }
 
@@ -90,13 +110,81 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun messages(): List<ChatMessage> = synchronized(lock) { messageList.toList() }
 
+    fun activeConversationId(): String = activeId
+
+    fun activeConversationTitle(): String = conversationTitle
+
+    fun conversations(): List<ConversationStore.ConversationMeta> {
+        val list = ConversationStore.list(appContext)
+        val current = ConversationStore.ConversationMeta(
+            activeId,
+            conversationTitle,
+            System.currentTimeMillis(),
+            activeSession
+        )
+        return if (list.any { it.id == activeId }) {
+            list.map { if (it.id == activeId) current else it }
+        } else {
+            listOf(current) + list
+        }
+    }
+
+    fun newConversation() {
+        val current = messages()
+        if (current.isEmpty() && conversationTitle == ConversationStore.defaultTitle()) return
+        generation++
+        activeClient?.cancel()
+        val meta = ConversationStore.create(appContext, AppPrefs.sessionId)
+        activate(meta, emptyList())
+        notifyChanged()
+    }
+
+    fun switchConversation(id: String) {
+        if (id == activeId) return
+        val meta = ConversationStore.list(appContext).firstOrNull { it.id == id } ?: return
+        generation++
+        activeClient?.cancel()
+        val loaded = ConversationStore.load(appContext, id)
+        val title = if (meta.title == ConversationStore.defaultTitle()) {
+            ConversationStore.titleFor(loaded)
+        } else {
+            meta.title
+        }
+        activate(meta.copy(title = title), loaded)
+        notifyChanged()
+    }
+
+    private fun activate(meta: ConversationStore.ConversationMeta, loaded: List<ChatMessage>) {
+        activeId = meta.id
+        activeSession = meta.sessionId
+        conversationTitle = meta.title
+        AppPrefs.activeConversationId = activeId
+        synchronized(lock) {
+            messageList.clear()
+            messageList.addAll(loaded)
+            lastQuestion = loaded.lastOrNull {
+                it.role == "user" && !it.isToolActivity && !it.isError
+            }?.text
+        }
+        pendingContext = null
+        streamingText = ""
+        isStreaming = false
+        status = "Prêt"
+        synchronized(imageCache) { imageCache.clear() }
+        BubbleService.setState(BubbleState.Idle)
+    }
+
     fun send(question: String) {
         val clean = question.trim()
         if (clean.isEmpty() || isStreaming) return
 
         val attached = resolveAttachContext()
         val header = attached?.let { buildContextHeader(it) }
-        val imagePath = ConversationStore.attachImage(appContext, attached?.imagePath)
+        val imagePath = if (AppPrefs.sendScreenshot) {
+            ConversationStore.attachImage(appContext, activeId, attached?.imagePath)
+        } else {
+            null
+        }
         pendingContext = null
 
         lastQuestion = clean
@@ -144,9 +232,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         streamingText = ""
         isStreaming = false
         status = "Prêt"
+        conversationTitle = ConversationStore.defaultTitle()
+        activeSession = ConversationStore.sessionFor(AppPrefs.sessionId, activeId)
         synchronized(imageCache) { imageCache.clear() }
         BubbleService.setState(BubbleState.Idle)
-        persistence.execute { ConversationStore.clear(appContext) }
+        persistence.execute { ConversationStore.save(appContext, activeMeta(), emptyList()) }
         notifyChanged()
     }
 
@@ -179,7 +269,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     null
                 }
-                val client = ApiClient.fromPrefs()
+                val client = ApiClient.fromPrefs(activeSession)
                 activeClient = client
                 val result = try {
                     client.send(buildWire(), tools) { piece ->
@@ -285,15 +375,28 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun addMessage(message: ChatMessage) {
         synchronized(lock) { messageList.add(message) }
+        if (conversationTitle == ConversationStore.defaultTitle()) {
+            val derived = ConversationStore.titleFor(messages())
+            if (derived != conversationTitle) conversationTitle = derived
+        }
         persist()
         main.post { notifyChanged() }
     }
 
+    private fun activeMeta(): ConversationStore.ConversationMeta =
+        ConversationStore.ConversationMeta(
+            activeId,
+            conversationTitle,
+            System.currentTimeMillis(),
+            activeSession
+        )
+
     private fun persist() {
         val turn = generation
         val snapshot = messages()
+        val meta = activeMeta()
         persistence.execute {
-            if (turn == generation) ConversationStore.save(appContext, snapshot)
+            if (turn == generation) ConversationStore.save(appContext, meta, snapshot)
         }
     }
 

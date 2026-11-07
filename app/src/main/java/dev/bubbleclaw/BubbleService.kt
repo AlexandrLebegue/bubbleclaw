@@ -42,6 +42,7 @@ class BubbleService : Service() {
 
         private const val CHANNEL_ID = "bubble"
         private const val NOTIFICATION_ID = 1
+        private const val BUBBLE_SIZE_DP = 32
         private const val MENU_OPEN = 1
         private const val MENU_CONTROL = 2
         private const val MENU_SETTINGS = 3
@@ -210,7 +211,7 @@ class BubbleService : Service() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         val layout = params ?: return
-        val size = dp(64)
+        val size = dp(BUBBLE_SIZE_DP)
         val width = resources.displayMetrics.widthPixels
         val height = resources.displayMetrics.heightPixels
         if (movedForChat) {
@@ -279,7 +280,7 @@ class BubbleService : Service() {
     private fun addBubble() {
         val manager = getSystemService(WINDOW_SERVICE) as WindowManager
         windowManager = manager
-        val size = dp(64)
+        val size = dp(BUBBLE_SIZE_DP)
         val metrics = resources.displayMetrics
         val width = metrics.widthPixels
         val height = metrics.heightPixels
@@ -348,7 +349,7 @@ class BubbleService : Service() {
 
     private fun clampY(layout: WindowManager.LayoutParams, screenHeight: Int) {
         val minY = dp(24)
-        val maxY = (screenHeight - dp(64) - dp(24)).coerceAtLeast(minY)
+        val maxY = (screenHeight - dp(BUBBLE_SIZE_DP) - dp(24)).coerceAtLeast(minY)
         layout.y = layout.y.coerceIn(minY, maxY)
     }
 
@@ -359,7 +360,7 @@ class BubbleService : Service() {
 
     private fun snapToEdge(layout: WindowManager.LayoutParams, width: Int, height: Int) {
         clampY(layout, height)
-        val size = dp(64)
+        val size = dp(BUBBLE_SIZE_DP)
         val center = layout.x + size / 2
         val target = if (center < width / 2) 0 else width - size
         AppPrefs.bubbleY = layout.y
@@ -519,7 +520,7 @@ class BubbleService : Service() {
         preChatY = layout.y
         movedForChat = true
         movedByUserSinceCenter = false
-        val size = dp(64)
+        val size = dp(BUBBLE_SIZE_DP)
         val width = resources.displayMetrics.widthPixels
         val targetX = ((width - size) / 2).coerceAtLeast(0)
         animateBubbleTo(layout, targetX, topBubbleY(), 220)
@@ -534,7 +535,7 @@ class BubbleService : Service() {
         movedForChat = false
         val width = resources.displayMetrics.widthPixels
         val height = resources.displayMetrics.heightPixels
-        val size = dp(64)
+        val size = dp(BUBBLE_SIZE_DP)
         if (movedByUserSinceCenter || preChatX < 0) {
             movedByUserSinceCenter = false
             snapToEdge(layout, width, height)
@@ -604,7 +605,7 @@ class BubbleService : Service() {
         ContextHolder.put(info)
         bubbleView?.state = BubbleState.Idle
         val screenHeight = resources.displayMetrics.heightPixels
-        val size = dp(64)
+        val size = dp(BUBBLE_SIZE_DP)
         val bubbleCenterX = if (movedForChat) {
             resources.displayMetrics.widthPixels / 2
         } else {
@@ -704,8 +705,11 @@ class BubbleService : Service() {
             .setMessage(getString(R.string.chat_clear_confirm))
             .setNegativeButton(getString(R.string.chat_clear_no), null)
             .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
-                ConversationStore.clear(this)
-                clearChatIfOpen()
+                if (isChatOpen()) {
+                    clearChatIfOpen()
+                } else {
+                    ConversationStore.clearActive(this, AppPrefs.sessionId)
+                }
                 Toast.makeText(this, getString(R.string.chat_cleared), Toast.LENGTH_SHORT).show()
             }
             .show()

@@ -69,4 +69,12 @@ object AppPrefs {
     var onboardingDone: Boolean
         get() = prefs.getBoolean("onboardingDone", false)
         set(value) = prefs.edit().putBoolean("onboardingDone", value).apply()
+
+    var sendScreenshot: Boolean
+        get() = prefs.getBoolean("sendScreenshot", false)
+        set(value) = prefs.edit().putBoolean("sendScreenshot", value).apply()
+
+    var activeConversationId: String
+        get() = prefs.getString("activeConversationId", "")!!
+        set(value) = prefs.edit().putString("activeConversationId", value).apply()
 }

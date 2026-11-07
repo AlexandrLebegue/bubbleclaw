@@ -58,11 +58,11 @@ class ApiClient(
             return null
         }
 
-        fun fromPrefs(): ApiClient = ApiClient(
+        fun fromPrefs(sessionId: String = AppPrefs.sessionId): ApiClient = ApiClient(
             AppPrefs.baseUrl,
             AppPrefs.token,
             AppPrefs.model,
-            AppPrefs.sessionId,
+            sessionId,
             AppPrefs.streamEnabled
         )
     }

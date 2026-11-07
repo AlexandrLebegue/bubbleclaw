@@ -12,10 +12,10 @@ contexte de ce que tu regardais, puis discute avec ton agent.
 
 ## Ce que ça fait
 
-- **Bulle persistante** (`BubbleService`) en service de premier plan, draggable,
-  qui se colle au bord le plus proche et mémorise sa position verticale et son
-  côté (gauche/droite), y compris après rotation. Si elle était active au
-  redémarrage, `BootReceiver` la relance après un reboot.
+- **Bulle persistante** (`BubbleService`) en service de premier plan, réduite à
+  32 dp, draggable, qui se colle au bord le plus proche et mémorise sa position
+  verticale et son côté (gauche/droite), y compris après rotation. Si elle était
+  active au redémarrage, `BootReceiver` la relance après un reboot.
 - **Capture d'écran sans popup MediaProjection** via l'API Accessibility
   (`takeScreenshot`, Android 11+), image réduite à 1080 px de large, JPEG q70,
   plus une vignette 320 px.
@@ -25,7 +25,7 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   nom, page et vignette 36 dp. Toute la ligne ouvre la capture en plein écran.
 - **Panneau de discussion flottant** : la fenêtre de chat est translucide et
   laisse voir l'application courante ; seule la carte du panneau est opaque
-  (`#FF1B1518`, largeur 92 % plafonnée à 420 dp, hauteur maximale 50 % de la
+  (`#FF1B1518`, largeur 92 % plafonnée à 420 dp, hauteur maximale 80 % de la
   zone utile, coins arrondis 24 dp, bordure corail, ombre). Marge de 16 dp sur
   les côtés. À l'ouverture, la bulle se déplace en haut au centre et le panneau
   s'ouvre juste en dessous. Un tap hors du panneau le ferme.
@@ -70,19 +70,24 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   local et, si le réglage `Envoyer les rapports de crash` est actif (par
   défaut), la POSTe vers `{gateway}/chat/completions` avec `user: android:crash`
   sur un thread limité à 2,5 s. La trace ne part que vers l'URL configurée.
-- **Conversation persistante** : le fil est enregistré dans
-  `filesDir/conversation.json` (écriture atomique par fichier temporaire puis
-  `rename`), rechargé à chaque ouverture, et survit donc à la fermeture du
-  panneau, à la rotation et aux relances. Les captures jointes sont copiées dans
-  `cacheDir/conversation` et référencées par chemin, jamais en base64 dans le
-  JSON ; les fichiers orphelins sont nettoyés.
+- **Conversations multiples** : chaque fil est enregistré dans
+  `filesDir/conversations/<id>.json` (écriture atomique), avec son titre, sa
+  date et son identifiant de session. Le titre de la conversation est cliquable
+  dans l'en-tête pour ouvrir un sélecteur compact ; le bouton `+` lance une
+  nouvelle conversation. Le sélecteur marque la conversation active et permet
+  de basculer sans perdre le fil courant.
+- **Session par conversation** : chaque conversation garde son propre champ
+  `user` côté gateway, donc deux fils ne se mélangent pas. Le bouton
+  « Effacer la conversation » réinitialise le fil actif et sa session.
+  Les captures jointes sont copiées dans `cacheDir/conversation/<id>` et
+  référencées par chemin, jamais en base64 dans le JSON.
 - **Historique envoyé au gateway** : tout le fil utile (hors erreurs) dans
   l'ordre, plafonné aux 40 derniers messages. Le premier message de la session
   porte l'en-tête de contexte et l'image ; les suivants n'envoient que le texte.
   Une icône appareil-photo dans la barre permet de rattacher une nouvelle
   capture au message suivant.
-- **Session stable** : le même identifiant de session est réutilisé d'un
-  lancement à l'autre, donc la conversation continue côté gateway.
+- **Sessions stables** : chaque conversation réutilise son identifiant de
+  session d'un lancement à l'autre, donc elle continue côté gateway.
 - **Animation de réflexion** : bulle dédiée avec le homard en humeur Thinking,
   trois points qui rebondissent en décalé (boucle 900 ms, décalage 150 ms) et
   légère pulsation. Elle disparaît dès le premier morceau de texte reçu ; aucun
@@ -153,6 +158,9 @@ Interrupteurs :
   active au premier message (max 1500 caractères).
 - **Mode contrôle** (off) : autorise les outils d'action sur l'écran.
 - **Réponses en streaming** (on) : désactivable pour forcer le mode non-stream.
+- **Envoyer la capture d'écran** (`Non` par défaut) : radio bouton `Non`/`Oui`.
+  Sur `Non`, la capture reste locale pour la vignette et le contexte visible,
+  mais l'image n'est jamais jointe aux messages envoyés au gateway.
 - **Envoyer les rapports de crash** (on) : la trace part uniquement vers l'URL
   du gateway configuré, jamais ailleurs. Désactivé, seul le fichier local
   `filesDir/crash-*.txt` est écrit.
@@ -195,11 +203,11 @@ app/src/main/java/dev/bubbleclaw/
   LobsterView.kt          mascotte Canvas (idle / thinking / happy)
   ContextHolder.kt        passage en mémoire entre bulle et chat + snapshot contexte
   ChatActivity.kt         panneau flottant, carte contexte, rendu des messages
-  ChatViewModel.kt        conversation persistée, boucle réseau/outils, rotation
+  ChatViewModel.kt        conversations persistées, boucle réseau/outils, rotation
   MarkdownParser.kt       parser markdown pur Kotlin (blocs + inline)
   MarkdownRenderer.kt     conversion du parser en Spannable Android
   ShimmerDrawable.kt      shimmer du squelette de contexte
-  ConversationStore.kt    JSON atomique, chemins d'images et nettoyage du cache
+  ConversationStore.kt    conversations JSON, sessions, images et nettoyage
   ThinkingIndicatorView.kt bulle de réflexion + points animés
   MaxHeightScrollView.kt  plafonne la hauteur du fil dans le panneau
   ApiClient.kt            HttpURLConnection + org.json, SSE et non-stream
@@ -232,11 +240,12 @@ Choix assumés :
   boucle d'outils ; `ConversationStore` écrit chaque ajout dans un fichier
   temporaire puis le renomme. L'activité ne fait que rendre l'état.
 - **Images de conversation** : le premier message (ou une reprise de contexte)
-  copie la capture dans `cacheDir/conversation` pour que l'élagage des captures
-  ne casse pas l'historique ; le JSON ne contient que le chemin.
-- **Effacement** : action confirmée dans le menu long-press de la bulle et dans
-  les réglages ; elle vide le JSON, le cache d'images, le fil en mémoire et,
-  si le panneau est ouvert, l'activité se met à jour immédiatement.
+  copie la capture dans `cacheDir/conversation/<id>` pour que l'élagage des
+  captures ne casse pas l'historique ; le JSON ne contient que le chemin.
+- **Effacement** : le menu de la bulle efface la conversation active (et sa
+  session), les réglages effacent toutes les conversations ; dans les deux cas
+  le cache d'images et le fil en mémoire suivent, et l'activité ouverte se met à
+  jour immédiatement.
 - **Confidentialité des crashes** : les traces sont d'abord écrites dans
   `filesDir`. L'envoi au gateway est un réglage explicite, actif par défaut,
   limité à l'URL configurée et à un thread court ; le jeton n'apparaît jamais
@@ -268,8 +277,8 @@ Vérifié ici : compilation `assembleDebug` verte après chaque point, test JVM
 `testDebugUnitTest` vert (markdown : gras, code inline, bloc de code, listes,
 markdown partiel), ressources et manifeste liés, APK produit. La version 0.7
 ajoute l'écran de diagnostic, le journal borné et l'envoi de crash consenti.
-Le panneau suit les insets IME, la conversation est relue depuis
-`conversation.json`, les
+Le panneau suit les insets IME, les conversations sont relues depuis
+`filesDir/conversations/`, les
 animations sont démarrées/arrêtées avec le cycle de vie, et le chat vide affiche
 un accueil court (une phrase + le homard) au lieu d'un écran blanc.
 

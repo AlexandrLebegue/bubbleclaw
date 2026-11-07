@@ -48,9 +48,17 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/conversation_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:contentDescription="@string/chat_choose_conversation"
+                    android:ellipsize="end"
+                    android:focusable="true"
                     android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:paddingEnd="8dp"
                     android:text="@string/chat_title"
                     android:textColor="@color/text_primary"
                     android:textSize="17sp" />
@@ -77,6 +85,17 @@
                         android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/new_conversation_button"
+                android:layout_width="44dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/chat_new_conversation"
+                android:gravity="center"
+                android:text="+"
+                android:textColor="@color/coral_light"
+                android:textSize="24sp" />
 
             <ImageButton
                 android:id="@+id/retake_context"

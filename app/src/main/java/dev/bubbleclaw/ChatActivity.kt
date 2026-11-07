@@ -20,6 +20,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.text.method.LinkMovementMethod
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -41,6 +42,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private lateinit var scroll: MaxHeightScrollView
     private lateinit var container: LinearLayout
     private lateinit var statusText: TextView
+    private lateinit var conversationTitle: TextView
     private lateinit var input: EditText
     private lateinit var sendButton: ImageButton
     private lateinit var contextApp: TextView
@@ -98,6 +100,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         scroll = findViewById(R.id.scroll)
         container = findViewById(R.id.messages_container)
         statusText = findViewById(R.id.status_text)
+        conversationTitle = findViewById(R.id.conversation_title)
         input = findViewById(R.id.input)
         sendButton = findViewById(R.id.send_button)
         contextApp = findViewById(R.id.context_app)
@@ -162,6 +165,10 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         }
 
         viewModel = ViewModelProvider(this).get(ChatViewModel::class.java)
+        conversationTitle.setOnClickListener { showConversationPicker() }
+        findViewById<TextView>(R.id.new_conversation_button).setOnClickListener {
+            viewModel.newConversation()
+        }
         ContextHolder.addListener(contextListener)
         contextInfo = resolveContext()
         populateContext(contextInfo)
@@ -465,6 +472,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             if (viewModel.isStreaming && viewModel.streamingText.isBlank()) View.VISIBLE
             else View.GONE
 
+        conversationTitle.text = "${viewModel.activeConversationTitle()} ▾"
         statusText.text = viewModel.status
         statusText.setTextColor(
             ContextCompat.getColor(
@@ -492,6 +500,29 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         }
 
         adjustScroll()
+    }
+
+    private fun showConversationPicker() {
+        val conversations = viewModel.conversations()
+        if (conversations.isEmpty()) {
+            viewModel.newConversation()
+            return
+        }
+        val labels = conversations.map {
+            val marker = if (it.id == viewModel.activeConversationId()) "✓ " else ""
+            "$marker${it.title}"
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.chat_conversations)
+            .setItems(labels) { dialog, which ->
+                viewModel.switchConversation(conversations[which].id)
+                dialog.dismiss()
+            }
+            .setPositiveButton(R.string.chat_new_conversation_action) { _, _ ->
+                viewModel.newConversation()
+            }
+            .setNegativeButton(R.string.chat_clear_no, null)
+            .show()
     }
 
     private fun addEmptyState() {
@@ -702,7 +733,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         val available = root.height - root.paddingTop - root.paddingBottom
         if (available <= 0) return
         val maxPanel = minOf(
-            (available * 0.50f).toInt(),
+            (available * 0.80f).toInt(),
             (available - dp(88) - dp(16)).coerceAtLeast(dp(120))
         )
         val contextHeight = if (contextCard.visibility == View.VISIBLE) contextCard.measuredHeight else 0
