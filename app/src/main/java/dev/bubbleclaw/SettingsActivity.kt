@@ -122,8 +122,7 @@ class SettingsActivity : AppCompatActivity() {
                     .setMessage(getString(R.string.chat_clear_all_confirm))
                     .setNegativeButton(getString(R.string.chat_clear_no), null)
                     .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
-                        ConversationStore.clearAll(this@SettingsActivity)
-                        BubbleService.clearChatIfOpen()
+                        ChatViewModel.get(this@SettingsActivity).clearAllConversations()
                         Toast.makeText(
                             this@SettingsActivity,
                             getString(R.string.chat_cleared),

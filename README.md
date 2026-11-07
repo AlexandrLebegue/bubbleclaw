@@ -42,7 +42,9 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   listes à puces et numérotées, liens cliquables corail et séparateurs. Les
   messages de l'assistant sont rendus en `Spannable` par un parser et un
   renderer maison, tolérants au markdown partiel du streaming ; les messages
-  utilisateur restent en texte simple.
+  utilisateur restent en texte simple. Les liens `[libellé](url)`, les URLs
+  nues et les autolinks `<https://…>` / `www.…` sont cliquables et colorés en
+  corail.
 - **Animation d'ouverture** : la bulle s'enfonce (0.86, 90 ms), glisse en haut
   au centre du téléphone (220 ms), puis le panneau se déploie depuis le centre
   de la bulle (0.85 → 1.0, fondu 180 ms). À chaque tap, le homard plisse les
@@ -54,6 +56,13 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   est tenu par `BubbleService`, renseigné par `ChatActivity` à la création et
   libéré à la destruction (rotation, retour arrière, fermeture par tap
   extérieur), donc une activité morte ne bloque jamais la bulle.
+- **Travail de fond synchronisé** : le moteur de conversation (`ChatViewModel`)
+  vit au niveau du process, pas de l'activité. Fermer le panneau ne coupe plus
+  la requête en cours : la réponse continue, se persiste dans la bonne
+  conversation et la bulle passe en `AnswerReady` ; la notification du service
+  affiche « Réponse prête ». À la réouverture, le fil et le streaming en cours
+  sont déjà là. Les écritures capturent conversation + messages sous le même
+  verrou, donc changer de fil ne perd plus la dernière sauvegarde.
 - **Chat en streaming SSE** vers `chat/completions`, avec `x-openclaw-model`
   pour sélectionner le modèle backend du gateway, et repli automatique en
   non-streaming, messages d'erreur en français et bouton « Réessayer ». Pendant
@@ -216,7 +225,7 @@ app/src/main/java/dev/bubbleclaw/
   LobsterView.kt          mascotte Canvas (idle / thinking / happy)
   ContextHolder.kt        passage en mémoire entre bulle et chat + snapshot contexte
   ChatActivity.kt         panneau flottant, carte contexte, rendu des messages
-  ChatViewModel.kt        conversations persistées, boucle réseau/outils, rotation
+  ChatViewModel.kt        moteur process-wide : conversations, réseau, outils
   MarkdownParser.kt       parser markdown pur Kotlin (blocs + inline)
   MarkdownRenderer.kt     conversion du parser en Spannable Android
   ShimmerDrawable.kt      shimmer du squelette de contexte
@@ -249,9 +258,10 @@ Choix assumés :
   panneau, l'IME reste géré par la fenêtre de l'activité (`adjustResize` +
   insets IME), la rotation et la sauvegarde d'état sont natives, et le service
   ne garde que la bulle.
-- **`ChatViewModel`** garde les messages, le texte en cours de streaming et la
-  boucle d'outils ; `ConversationStore` écrit chaque ajout dans un fichier
-  temporaire puis le renomme. L'activité ne fait que rendre l'état.
+- **`ChatViewModel`** est un singleton applicatif (`ChatViewModel.get`) : il
+  garde les messages, le streaming et la boucle d'outils même quand le panneau
+  est fermé. `ConversationStore` écrit chaque ajout dans un fichier temporaire
+  puis le renomme ; l'activité ne fait que s'attacher/détacher et rendre l'état.
 - **Images de conversation** : le premier message (ou une reprise de contexte)
   copie la capture dans `cacheDir/conversation/<id>` pour que l'élagage des
   captures ne casse pas l'historique ; le JSON ne contient que le chemin.

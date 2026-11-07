@@ -85,15 +85,26 @@ class BubbleService : Service() {
             } else {
                 service.handler.post { runCatching { apply() } }
             }
+            if (state == BubbleState.AnswerReady) {
+                service.handler.post {
+                    if (!isChatOpen()) {
+                        service.updateNotification(
+                            service.getString(R.string.bubble_notification_ready)
+                        )
+                    }
+                }
+            }
         }
 
         fun isRunning(): Boolean = instance != null
 
         fun onChatOpened(activity: ChatActivity) {
             chatActivity = WeakReference(activity)
-            instance?.ensureChatBubblePosition()
-            instance?.bubbleView?.contentDescription =
-                instance?.getString(R.string.bubble_description_close)
+            val service = instance
+            service?.ensureChatBubblePosition()
+            service?.bubbleView?.contentDescription =
+                service.getString(R.string.bubble_description_close)
+            service?.updateNotification(service.getString(R.string.bubble_notification_text))
         }
 
         fun onChatClosed(activity: ChatActivity, keepPendingCapture: Boolean = false) {
@@ -114,12 +125,6 @@ class BubbleService : Service() {
             val activity = chatActivity?.get() ?: return
             if (activity.isFinishing || activity.isDestroyed) return
             activity.requestCloseFromBubble()
-        }
-
-        fun clearChatIfOpen() {
-            val activity = chatActivity?.get() ?: return
-            if (activity.isFinishing || activity.isDestroyed) return
-            activity.clearConversationFromOutside()
         }
 
         fun sinkBubble() {
@@ -259,7 +264,16 @@ class BubbleService : Service() {
         manager.createNotificationChannel(channel)
     }
 
-    private fun buildNotification(): Notification {
+    private fun updateNotification(contentText: String) {
+        runCatching {
+            getSystemService(NotificationManager::class.java)
+                ?.notify(NOTIFICATION_ID, buildNotification(contentText))
+        }
+    }
+
+    private fun buildNotification(
+        contentText: String = getString(R.string.bubble_notification_text)
+    ): Notification {
         val openIntent = PendingIntent.getActivity(
             this,
             0,
@@ -275,7 +289,7 @@ class BubbleService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.bubble_notification_title))
-            .setContentText(getString(R.string.bubble_notification_text))
+            .setContentText(contentText)
             .setContentIntent(openIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -735,11 +749,7 @@ class BubbleService : Service() {
             .setMessage(getString(R.string.chat_clear_confirm))
             .setNegativeButton(getString(R.string.chat_clear_no), null)
             .setPositiveButton(getString(R.string.chat_clear_yes)) { _, _ ->
-                if (isChatOpen()) {
-                    clearChatIfOpen()
-                } else {
-                    ConversationStore.clearActive(this, AppPrefs.sessionId)
-                }
+                ChatViewModel.get(this).clearConversation()
                 Toast.makeText(this, getString(R.string.chat_cleared), Toast.LENGTH_SHORT).show()
             }
             .show()

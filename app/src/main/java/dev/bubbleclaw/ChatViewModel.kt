@@ -1,12 +1,13 @@
 package dev.bubbleclaw
 
-import android.app.Application
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
-import androidx.lifecycle.AndroidViewModel
 import org.json.JSONArray
 import java.io.File
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 
@@ -14,13 +15,24 @@ import java.util.concurrent.Executors
  * Owns the persisted conversation and the network turn loop so that rotation, closing
  * the panel and relaunching never lose messages. Network and disk work never run on main.
  */
-class ChatViewModel(application: Application) : AndroidViewModel(application) {
+class ChatViewModel private constructor(context: Context) {
 
     interface Listener {
         fun onChanged()
     }
 
-    private val appContext = application.applicationContext
+    companion object {
+        @Volatile
+        private var instance: ChatViewModel? = null
+
+        /** Process-wide engine so a turn keeps running after the panel is closed. */
+        fun get(context: Context): ChatViewModel =
+            instance ?: synchronized(this) {
+                instance ?: ChatViewModel(context.applicationContext).also { instance = it }
+            }
+    }
+
+    private val appContext = context
     private val listeners = CopyOnWriteArrayList<Listener>()
     private val lock = Any()
     private val messageList = ArrayList<ChatMessage>()
@@ -29,9 +41,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val main = Handler(Looper.getMainLooper())
     private val imageCache = HashMap<String, String>()
 
+    @Volatile
     private var activeId: String = ""
     private var activeSession: String = AppPrefs.sessionId
     private var conversationTitle: String = ConversationStore.defaultTitle()
+
+    @Volatile
+    private var dataEpoch: Int = 0
+    private val deletedIds: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
     @Volatile
     private var activeClient: ApiClient? = null
@@ -168,6 +186,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val exists = ConversationStore.list(appContext).any { it.id == id }
         if (!exists) return false
         Diag.log("conversation deleted")
+        deletedIds.add(id)
         if (id != activeId) {
             ConversationStore.delete(appContext, id)
             return true
@@ -193,17 +212,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun activate(meta: ConversationStore.ConversationMeta, loaded: List<ChatMessage>) {
-        activeId = meta.id
-        activeSession = meta.sessionId
-        conversationTitle = meta.title
-        AppPrefs.activeConversationId = activeId
         synchronized(lock) {
+            activeId = meta.id
+            activeSession = meta.sessionId
+            conversationTitle = meta.title
             messageList.clear()
             messageList.addAll(loaded)
             lastQuestion = loaded.lastOrNull {
                 it.role == "user" && !it.isToolActivity && !it.isError
             }?.text
         }
+        AppPrefs.activeConversationId = meta.id
         pendingContext = null
         pendingAttachmentPath = null
         streamingText = ""
@@ -258,24 +277,37 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun clearAllConversations() {
+        generation++
+        val previous = ConversationStore.list(appContext).map { it.id }
+        deletedIds.addAll(previous)
+        activeClient?.cancel()
+        ConversationStore.clearAll(appContext)
+        val meta = ConversationStore.create(appContext, AppPrefs.sessionId)
+        activate(meta, emptyList())
+        notifyChanged()
+    }
+
     fun clearConversation() {
         Diag.log("conversation cleared")
         generation++
         activeClient?.cancel()
-        synchronized(lock) {
+        val meta = synchronized(lock) {
+            dataEpoch++
             messageList.clear()
             lastQuestion = null
+            conversationTitle = ConversationStore.defaultTitle()
+            activeSession = ConversationStore.sessionFor(AppPrefs.sessionId, activeId)
+            activeMetaLocked()
         }
         pendingContext = null
         pendingAttachmentPath = null
         streamingText = ""
         isStreaming = false
         status = "Prêt"
-        conversationTitle = ConversationStore.defaultTitle()
-        activeSession = ConversationStore.sessionFor(AppPrefs.sessionId, activeId)
         synchronized(imageCache) { imageCache.clear() }
         BubbleService.setState(BubbleState.Idle)
-        persistence.execute { ConversationStore.save(appContext, activeMeta(), emptyList()) }
+        persistence.execute { ConversationStore.save(appContext, meta, emptyList()) }
         notifyChanged()
     }
 
@@ -290,15 +322,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private fun startTurn() {
         Diag.log("network turn start")
         val turn = generation
+        val session = activeSession
         isStreaming = true
         streamingText = ""
         status = "Connexion…"
         BubbleService.setState(BubbleState.Thinking)
         notifyChanged()
-        executor.execute { runTurn(turn) }
+        executor.execute { runTurn(turn, session) }
     }
 
-    private fun runTurn(turn: Int) {
+    private fun runTurn(turn: Int, session: String) {
         var iteration = 0
         try {
             while (true) {
@@ -308,7 +341,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     null
                 }
-                val client = ApiClient.fromPrefs(activeSession)
+                val client = ApiClient.fromPrefs(session)
                 activeClient = client
                 val result = try {
                     client.send(buildWire(), tools) { piece ->
@@ -413,16 +446,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun addMessage(message: ChatMessage) {
-        synchronized(lock) { messageList.add(message) }
-        if (conversationTitle == ConversationStore.defaultTitle()) {
-            val derived = ConversationStore.titleFor(messages())
-            if (derived != conversationTitle) conversationTitle = derived
+        synchronized(lock) {
+            messageList.add(message)
+            if (conversationTitle == ConversationStore.defaultTitle()) {
+                val derived = ConversationStore.titleFor(messageList)
+                if (derived != conversationTitle) conversationTitle = derived
+            }
         }
         persist()
         main.post { notifyChanged() }
     }
 
-    private fun activeMeta(): ConversationStore.ConversationMeta =
+    private fun activeMetaLocked(): ConversationStore.ConversationMeta =
         ConversationStore.ConversationMeta(
             activeId,
             conversationTitle,
@@ -431,11 +466,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     private fun persist() {
-        val turn = generation
-        val snapshot = messages()
-        val meta = activeMeta()
+        val meta: ConversationStore.ConversationMeta
+        val snapshot: List<ChatMessage>
+        val epoch: Int
+        synchronized(lock) {
+            meta = activeMetaLocked()
+            snapshot = messageList.toList()
+            epoch = dataEpoch
+        }
         persistence.execute {
-            if (turn == generation) ConversationStore.save(appContext, meta, snapshot)
+            if (deletedIds.contains(meta.id)) return@execute
+            if (meta.id == activeId && epoch != dataEpoch) return@execute
+            ConversationStore.save(appContext, meta, snapshot)
         }
     }
 
@@ -490,13 +532,4 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         return data
     }
 
-    override fun onCleared() {
-        generation++
-        activeClient?.cancel()
-        BubbleService.setState(BubbleState.Idle)
-        executor.shutdownNow()
-        persistence.shutdown()
-        listeners.clear()
-        super.onCleared()
-    }
 }
