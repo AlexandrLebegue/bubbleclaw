@@ -251,7 +251,10 @@ class ApiClient(
         connection.setRequestProperty("Accept", accept)
         connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
         if (token.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
-        if (backendModel.isNotBlank()) connection.setRequestProperty("x-openclaw-model", backendModel)
+        if (backendModel.isNotBlank()) {
+            connection.setRequestProperty("x-openclaw-model", backendModel)
+            Diag.log("http $method backend=$backendModel")
+        }
         activeConnection = connection
         return connection
     }

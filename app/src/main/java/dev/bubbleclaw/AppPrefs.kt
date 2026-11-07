@@ -12,6 +12,7 @@ object AppPrefs {
     const val BUBBLE_SIZE_MIN_DP = 32
     const val BUBBLE_SIZE_MAX_DP = 72
     const val BUBBLE_SIZE_DEFAULT_DP = 48
+    const val DEFAULT_BACKEND_MODEL = "hyperqwen/qwen3.8-27b"
 
     private lateinit var prefs: SharedPreferences
 
@@ -34,8 +35,12 @@ object AppPrefs {
         set(value) = prefs.edit().putString("model", value.trim()).apply()
 
     var backendModel: String
-        get() = prefs.getString("backendModel", "hyperqwen/qwen3.8-27b")!!
-        set(value) = prefs.edit().putString("backendModel", value.trim()).apply()
+        get() = prefs.getString("backendModel", DEFAULT_BACKEND_MODEL)
+            .orEmpty()
+            .ifBlank { DEFAULT_BACKEND_MODEL }
+        set(value) = prefs.edit()
+            .putString("backendModel", value.trim().ifBlank { DEFAULT_BACKEND_MODEL })
+            .apply()
 
     var sessionId: String
         get() = prefs.getString("sessionId", "android:bubbleclaw")!!

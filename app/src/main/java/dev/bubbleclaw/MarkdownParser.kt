@@ -16,6 +16,10 @@ sealed interface MdBlock {
     data class CodeBlock(val code: String) : MdBlock
     data class BulletList(val items: List<List<MdInline>>) : MdBlock
     data class NumberedList(val items: List<List<MdInline>>) : MdBlock
+    data class Table(
+        val headers: List<List<MdInline>>,
+        val rows: List<List<List<MdInline>>>
+    ) : MdBlock
     data object Divider : MdBlock
 }
 
@@ -65,6 +69,24 @@ object MarkdownParser {
             if (trimmed.isEmpty()) {
                 flushParagraph()
                 index++
+                continue
+            }
+
+            if (trimmed.contains('|') && index + 1 < lines.size &&
+                isTableSeparator(lines[index + 1])
+            ) {
+                flushParagraph()
+                val headers = splitTableRow(trimmed).map(::parseInline)
+                val rows = mutableListOf<List<List<MdInline>>>()
+                index += 2
+                while (index < lines.size) {
+                    val rowLine = lines[index].trim()
+                    if (rowLine.isEmpty() || !rowLine.contains('|')) break
+                    val cells = splitTableRow(rowLine).map(::parseInline)
+                    rows.add(normalizeRow(cells, headers.size))
+                    index++
+                }
+                blocks.add(MdBlock.Table(headers, rows))
                 continue
             }
 
@@ -215,6 +237,25 @@ object MarkdownParser {
         }
         flush()
         return result
+    }
+
+    private fun isTableSeparator(line: String): Boolean {
+        val cells = splitTableRow(line)
+        if (cells.size < 2) return false
+        return cells.all { cell -> Regex("^:?-{3,}:?$").matches(cell.trim()) }
+    }
+
+    private fun splitTableRow(line: String): List<String> {
+        var value = line.trim()
+        if (value.startsWith("|")) value = value.substring(1)
+        if (value.endsWith("|")) value = value.dropLast(1)
+        return value.split('|').map { it.trim() }
+    }
+
+    private fun normalizeRow(cells: List<List<MdInline>>, size: Int): List<List<MdInline>> {
+        if (cells.size == size) return cells
+        if (cells.size > size) return cells.take(size)
+        return cells + List(size - cells.size) { emptyList() }
     }
 
     private fun findUrlEnd(text: String, start: Int): Int {
