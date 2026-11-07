@@ -209,6 +209,29 @@
             android:paddingEnd="10dp"
             android:paddingBottom="10dp">
 
+            <ImageButton
+                android:id="@+id/screenshot_toggle"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginBottom="2dp"
+                android:background="@drawable/bg_composer_toggle"
+                android:contentDescription="@string/chat_send_screenshot_off"
+                android:padding="9dp"
+                android:src="@drawable/ic_image"
+                app:tint="@color/attach_toggle_tint" />
+
+            <ImageButton
+                android:id="@+id/attach_button"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="6dp"
+                android:layout_marginBottom="2dp"
+                android:background="@drawable/bg_composer_toggle"
+                android:contentDescription="@string/chat_attach_file"
+                android:padding="9dp"
+                android:src="@drawable/ic_attach"
+                app:tint="@color/attach_toggle_tint" />
+
             <EditText
                 android:id="@+id/input"
                 android:layout_width="0dp"

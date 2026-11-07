@@ -9,6 +9,9 @@ import android.content.SharedPreferences
  */
 object AppPrefs {
     private const val FILE = "bubbleclaw"
+    const val BUBBLE_SIZE_MIN_DP = 32
+    const val BUBBLE_SIZE_MAX_DP = 72
+    const val BUBBLE_SIZE_DEFAULT_DP = 48
 
     private lateinit var prefs: SharedPreferences
 
@@ -57,6 +60,13 @@ object AppPrefs {
     var crashReportsEnabled: Boolean
         get() = prefs.getBoolean("crashReportsEnabled", true)
         set(value) = prefs.edit().putBoolean("crashReportsEnabled", value).apply()
+
+    var bubbleSizeDp: Int
+        get() = prefs.getInt("bubbleSizeDp", BUBBLE_SIZE_DEFAULT_DP)
+            .coerceIn(BUBBLE_SIZE_MIN_DP, BUBBLE_SIZE_MAX_DP)
+        set(value) = prefs.edit()
+            .putInt("bubbleSizeDp", value.coerceIn(BUBBLE_SIZE_MIN_DP, BUBBLE_SIZE_MAX_DP))
+            .apply()
 
     var bubbleY: Int
         get() = prefs.getInt("bubbleY", -1)

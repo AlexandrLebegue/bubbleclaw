@@ -3,9 +3,11 @@ package dev.bubbleclaw
 import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
@@ -19,8 +21,9 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import android.text.method.LinkMovementMethod
-import androidx.appcompat.app.AlertDialog
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -43,6 +46,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private lateinit var container: LinearLayout
     private lateinit var statusText: TextView
     private lateinit var conversationTitle: TextView
+    private lateinit var screenshotToggle: ImageButton
+    private lateinit var attachButton: ImageButton
     private lateinit var input: EditText
     private lateinit var sendButton: ImageButton
     private lateinit var contextApp: TextView
@@ -66,6 +71,10 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
     private var bubbleCenterX = -1
     private var bubbleCenterY = -1
     private var closing = false
+
+    private val pickAttachment = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) importAttachment(uri)
+    }
 
     private val contextListener: (ScreenContextInfo?) -> Unit = { info ->
         if (info != null) {
@@ -101,6 +110,8 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         container = findViewById(R.id.messages_container)
         statusText = findViewById(R.id.status_text)
         conversationTitle = findViewById(R.id.conversation_title)
+        screenshotToggle = findViewById(R.id.screenshot_toggle)
+        attachButton = findViewById(R.id.attach_button)
         input = findViewById(R.id.input)
         sendButton = findViewById(R.id.send_button)
         contextApp = findViewById(R.id.context_app)
@@ -169,6 +180,11 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
         findViewById<TextView>(R.id.new_conversation_button).setOnClickListener {
             viewModel.newConversation()
         }
+        screenshotToggle.setOnClickListener {
+            AppPrefs.sendScreenshot = !AppPrefs.sendScreenshot
+            updateComposerToggles()
+        }
+        attachButton.setOnClickListener { pickAttachment.launch("image/*") }
         ContextHolder.addListener(contextListener)
         contextInfo = resolveContext()
         populateContext(contextInfo)
@@ -473,6 +489,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             else View.GONE
 
         conversationTitle.text = "${viewModel.activeConversationTitle()} ▾"
+        updateComposerToggles()
         statusText.text = viewModel.status
         statusText.setTextColor(
             ContextCompat.getColor(
@@ -504,25 +521,160 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     private fun showConversationPicker() {
         val conversations = viewModel.conversations()
-        if (conversations.isEmpty()) {
-            viewModel.newConversation()
-            return
-        }
-        val labels = conversations.map {
-            val marker = if (it.id == viewModel.activeConversationId()) "✓ " else ""
-            "$marker${it.title}"
-        }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle(R.string.chat_conversations)
-            .setItems(labels) { dialog, which ->
-                viewModel.switchConversation(conversations[which].id)
+        val dialog = Dialog(this, R.style.Theme_BubbleClaw_Dialog)
+        val view = layoutInflater.inflate(R.layout.dialog_conversations, null)
+        dialog.setContentView(view)
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        dialog.window?.setDimAmount(0.35f)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.9f).toInt(),
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+
+        val scroll = view.findViewById<MaxHeightScrollView>(R.id.conversation_scroll)
+        scroll.maxHeight = (resources.displayMetrics.heightPixels * 0.5f).toInt()
+        val list = view.findViewById<LinearLayout>(R.id.conversation_list)
+        val dateFormat = SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE)
+        conversations.forEachIndexed { index, conversation ->
+            val active = conversation.id == viewModel.activeConversationId()
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(6), dp(11), dp(6), dp(11))
+                isClickable = true
+                isFocusable = true
+                setBackgroundResource(selectableItemBackground())
+            }
+            row.addView(
+                TextView(this).apply {
+                    text = if (active) "✓" else ""
+                    width = dp(26)
+                    setTextColor(ContextCompat.getColor(this@ChatActivity, R.color.coral_light))
+                    textSize = 16f
+                    gravity = Gravity.CENTER
+                }
+            )
+            val labels = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            labels.addView(
+                TextView(this).apply {
+                    text = conversation.title
+                    setTextColor(
+                        ContextCompat.getColor(
+                            this@ChatActivity,
+                            if (active) R.color.coral_light else R.color.text_primary
+                        )
+                    )
+                    textSize = 15f
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                }
+            )
+            labels.addView(
+                TextView(this).apply {
+                    text = dateFormat.format(Date(conversation.updatedAt))
+                    setTextColor(ContextCompat.getColor(this@ChatActivity, R.color.text_secondary))
+                    textSize = 11f
+                }
+            )
+            row.addView(labels)
+            row.setOnClickListener {
+                viewModel.switchConversation(conversation.id)
                 dialog.dismiss()
             }
-            .setPositiveButton(R.string.chat_new_conversation_action) { _, _ ->
-                viewModel.newConversation()
+            list.addView(row)
+            if (index < conversations.lastIndex) {
+                list.addView(
+                    View(this).apply {
+                        setBackgroundColor(ContextCompat.getColor(this@ChatActivity, R.color.panel_high))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            dp(1)
+                        )
+                    }
+                )
             }
-            .setNegativeButton(R.string.chat_clear_no, null)
-            .show()
+        }
+
+        view.findViewById<TextView>(R.id.conversation_dialog_close)
+            .setOnClickListener { dialog.dismiss() }
+        view.findViewById<com.google.android.material.button.MaterialButton>(R.id.conversation_new_button)
+            .setOnClickListener {
+                viewModel.newConversation()
+                dialog.dismiss()
+            }
+        dialog.show()
+    }
+
+    private fun selectableItemBackground(): Int {
+        val typed = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackground, typed, true)
+        return typed.resourceId
+    }
+
+    private fun updateComposerToggles() {
+        if (!::viewModel.isInitialized) return
+        val sendScreenshot = AppPrefs.sendScreenshot
+        screenshotToggle.isSelected = sendScreenshot
+        screenshotToggle.contentDescription = getString(
+            if (sendScreenshot) R.string.chat_send_screenshot_on else R.string.chat_send_screenshot_off
+        )
+        if (::attachButton.isInitialized) {
+            attachButton.isSelected = viewModel.hasPendingAttachment()
+        }
+    }
+
+    private fun importAttachment(uri: Uri) {
+        Thread {
+            val bitmap = decodeAttachment(uri)
+            if (bitmap == null) {
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    Toast.makeText(
+                        this,
+                        getString(R.string.chat_attachment_unsupported),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                return@Thread
+            }
+            val scaled = scaleToMaxWidth(bitmap, 1080)
+            if (scaled !== bitmap) bitmap.recycle()
+            val directory = java.io.File(cacheDir, "attachments").apply { mkdirs() }
+            val target = java.io.File(directory, "attach_${System.currentTimeMillis()}.jpg")
+            val written = runCatching {
+                target.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+            }.getOrDefault(false)
+            scaled.recycle()
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (written && target.exists()) {
+                    viewModel.setPendingAttachment(target.absolutePath)
+                    updateComposerToggles()
+                    Toast.makeText(this, getString(R.string.chat_attachment_added), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.chat_attachment_failed), Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun decodeAttachment(uri: Uri): Bitmap? = runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        while (bounds.outWidth > 0 && bounds.outWidth / sample > 2160) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+    }.getOrNull()
+
+    private fun scaleToMaxWidth(source: Bitmap, maxWidth: Int): Bitmap {
+        if (source.width <= maxWidth) return source
+        val ratio = maxWidth.toFloat() / source.width
+        val height = (source.height * ratio).toInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(source, maxWidth, height, true)
     }
 
     private fun addEmptyState() {

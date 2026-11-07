@@ -43,6 +43,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingContext: ScreenContextInfo? = null
 
     @Volatile
+    private var pendingAttachmentPath: String? = null
+
+    @Volatile
     private var generation: Int = 0
 
     @Volatile
@@ -108,6 +111,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         notifyChanged()
     }
 
+    fun setPendingAttachment(path: String?) {
+        pendingAttachmentPath = path
+        notifyChanged()
+    }
+
+    fun hasPendingAttachment(): Boolean = pendingAttachmentPath != null
+
     fun messages(): List<ChatMessage> = synchronized(lock) { messageList.toList() }
 
     fun activeConversationId(): String = activeId
@@ -167,6 +177,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }?.text
         }
         pendingContext = null
+        pendingAttachmentPath = null
         streamingText = ""
         isStreaming = false
         status = "Prêt"
@@ -180,12 +191,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         val attached = resolveAttachContext()
         val header = attached?.let { buildContextHeader(it) }
-        val imagePath = if (AppPrefs.sendScreenshot) {
-            ConversationStore.attachImage(appContext, activeId, attached?.imagePath)
-        } else {
-            null
-        }
+        val sourceImage = pendingAttachmentPath
+            ?: if (AppPrefs.sendScreenshot) attached?.imagePath else null
+        val imagePath = ConversationStore.attachImage(appContext, activeId, sourceImage)
         pendingContext = null
+        pendingAttachmentPath = null
 
         lastQuestion = clean
         addMessage(
@@ -229,6 +239,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             lastQuestion = null
         }
         pendingContext = null
+        pendingAttachmentPath = null
         streamingText = ""
         isStreaming = false
         status = "Prêt"
@@ -245,7 +256,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val hasUserMessage = synchronized(lock) {
             messageList.any { it.role == "user" && !it.isToolActivity && !it.isError }
         }
-        return if (hasUserMessage) null else contextInfo
+        return if (!hasUserMessage || AppPrefs.sendScreenshot) contextInfo else null
     }
 
     private fun startTurn() {

@@ -42,7 +42,6 @@ class BubbleService : Service() {
 
         private const val CHANNEL_ID = "bubble"
         private const val NOTIFICATION_ID = 1
-        private const val BUBBLE_SIZE_DP = 32
         private const val MENU_OPEN = 1
         private const val MENU_CONTROL = 2
         private const val MENU_SETTINGS = 3
@@ -125,6 +124,10 @@ class BubbleService : Service() {
 
         fun sinkBubble() {
             instance?.animateBubbleSink()
+        }
+
+        fun refreshBubbleSize() {
+            instance?.resizeBubble()
         }
 
         fun restoreBubble(restorePosition: Boolean = true) {
@@ -211,7 +214,7 @@ class BubbleService : Service() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         val layout = params ?: return
-        val size = dp(BUBBLE_SIZE_DP)
+        val size = dp(AppPrefs.bubbleSizeDp)
         val width = resources.displayMetrics.widthPixels
         val height = resources.displayMetrics.heightPixels
         if (movedForChat) {
@@ -280,7 +283,7 @@ class BubbleService : Service() {
     private fun addBubble() {
         val manager = getSystemService(WINDOW_SERVICE) as WindowManager
         windowManager = manager
-        val size = dp(BUBBLE_SIZE_DP)
+        val size = dp(AppPrefs.bubbleSizeDp)
         val metrics = resources.displayMetrics
         val width = metrics.widthPixels
         val height = metrics.heightPixels
@@ -349,7 +352,7 @@ class BubbleService : Service() {
 
     private fun clampY(layout: WindowManager.LayoutParams, screenHeight: Int) {
         val minY = dp(24)
-        val maxY = (screenHeight - dp(BUBBLE_SIZE_DP) - dp(24)).coerceAtLeast(minY)
+        val maxY = (screenHeight - dp(AppPrefs.bubbleSizeDp) - dp(24)).coerceAtLeast(minY)
         layout.y = layout.y.coerceIn(minY, maxY)
     }
 
@@ -358,9 +361,27 @@ class BubbleService : Service() {
         runCatching { windowManager?.updateViewLayout(view, layout) }
     }
 
+    private fun resizeBubble() {
+        val layout = params ?: return
+        val size = dp(AppPrefs.bubbleSizeDp)
+        if (layout.width == size && layout.height == size) return
+        val width = resources.displayMetrics.widthPixels
+        val height = resources.displayMetrics.heightPixels
+        layout.width = size
+        layout.height = size
+        if (movedForChat) {
+            layout.x = ((width - size) / 2).coerceAtLeast(0)
+            layout.y = topBubbleY()
+        } else {
+            layout.x = if (AppPrefs.bubbleOnLeft) 0 else (width - size).coerceAtLeast(0)
+            clampY(layout, height)
+        }
+        updateLayout(layout)
+    }
+
     private fun snapToEdge(layout: WindowManager.LayoutParams, width: Int, height: Int) {
         clampY(layout, height)
-        val size = dp(BUBBLE_SIZE_DP)
+        val size = dp(AppPrefs.bubbleSizeDp)
         val center = layout.x + size / 2
         val target = if (center < width / 2) 0 else width - size
         AppPrefs.bubbleY = layout.y
@@ -520,7 +541,7 @@ class BubbleService : Service() {
         preChatY = layout.y
         movedForChat = true
         movedByUserSinceCenter = false
-        val size = dp(BUBBLE_SIZE_DP)
+        val size = dp(AppPrefs.bubbleSizeDp)
         val width = resources.displayMetrics.widthPixels
         val targetX = ((width - size) / 2).coerceAtLeast(0)
         animateBubbleTo(layout, targetX, topBubbleY(), 220)
@@ -535,7 +556,7 @@ class BubbleService : Service() {
         movedForChat = false
         val width = resources.displayMetrics.widthPixels
         val height = resources.displayMetrics.heightPixels
-        val size = dp(BUBBLE_SIZE_DP)
+        val size = dp(AppPrefs.bubbleSizeDp)
         if (movedByUserSinceCenter || preChatX < 0) {
             movedByUserSinceCenter = false
             snapToEdge(layout, width, height)
@@ -605,7 +626,7 @@ class BubbleService : Service() {
         ContextHolder.put(info)
         bubbleView?.state = BubbleState.Idle
         val screenHeight = resources.displayMetrics.heightPixels
-        val size = dp(BUBBLE_SIZE_DP)
+        val size = dp(AppPrefs.bubbleSizeDp)
         val bubbleCenterX = if (movedForChat) {
             resources.displayMetrics.widthPixels / 2
         } else {
