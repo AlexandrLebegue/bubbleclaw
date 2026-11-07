@@ -29,6 +29,7 @@ object MarkdownParser {
     private val dividerRx = Regex("^(-{3,}|\\*{3,}|_{3,})$")
     private val bulletRx = Regex("^\\s*[-*+]\\s+(.*)$")
     private val numberedRx = Regex("^\\s*\\d+[.)]\\s+(.*)$")
+    private val bareUrlRx = Regex("^(https?://|www\\.)", RegexOption.IGNORE_CASE)
 
     fun parse(markdown: String): List<MdBlock> {
         val lines = markdown.replace("\r\n", "\n").replace('\r', '\n').split('\n')
@@ -185,10 +186,53 @@ object MarkdownParser {
                 }
             }
 
+            if (char == '<') {
+                val end = text.indexOf('>', index + 1)
+                if (end > index + 1) {
+                    val inner = text.substring(index + 1, end).trim()
+                    if (bareUrlRx.containsMatchIn(inner) || inner.startsWith("mailto:", true)) {
+                        flush()
+                        result.add(MdInline.Link(inner, normalizeUrl(inner)))
+                        index = end + 1
+                        continue
+                    }
+                }
+            }
+
+            if (bareUrlRx.containsMatchIn(text.substring(index, minOf(text.length, index + 8)))) {
+                val end = findUrlEnd(text, index)
+                if (end > index) {
+                    val url = text.substring(index, end)
+                    flush()
+                    result.add(MdInline.Link(url, normalizeUrl(url)))
+                    index = end
+                    continue
+                }
+            }
+
             literal.append(char)
             index++
         }
         flush()
         return result
     }
+
+    private fun findUrlEnd(text: String, start: Int): Int {
+        var end = start
+        while (end < text.length) {
+            val char = text[end]
+            if (char.isWhitespace() || char == '<' || char == '>') break
+            end++
+        }
+        while (end > start && text[end - 1] in ".,;:!?") end--
+        while (end > start && text[end - 1] == ')' &&
+            text.substring(start, end).count { it == ')' } > text.substring(start, end).count { it == '(' }
+        ) {
+            end--
+        }
+        return end
+    }
+
+    private fun normalizeUrl(url: String): String =
+        if (url.startsWith("www.", ignoreCase = true)) "https://$url" else url
 }

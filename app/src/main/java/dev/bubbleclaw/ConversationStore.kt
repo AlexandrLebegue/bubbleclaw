@@ -57,7 +57,6 @@ object ConversationStore {
                 }
                 result
             }.getOrDefault(emptyList())
-            cleanupOrphans(context, id, messages)
             return messages
         }
     }
@@ -81,7 +80,6 @@ object ConversationStore {
                     target.delete()
                     if (!temp.renameTo(target)) temp.delete()
                 }
-                cleanupOrphans(context, meta.id, messages)
             }
         }
     }
@@ -99,29 +97,11 @@ object ConversationStore {
         return meta
     }
 
-    /** Empties a conversation and gives it a fresh gateway session. */
-    fun reset(context: Context, id: String, baseSessionId: String): ConversationMeta? {
-        val current = synchronized(lock) { metaOf(file(context, id)) } ?: return null
-        val meta = current.copy(
-            title = DEFAULT_TITLE,
-            updatedAt = System.currentTimeMillis(),
-            sessionId = sessionFor(baseSessionId, id)
-        )
-        save(context, meta, emptyList())
-        runCatching { imageDirectory(context, id).deleteRecursively() }
-        return meta
-    }
-
     fun delete(context: Context, id: String) {
         synchronized(lock) {
             runCatching { file(context, id).delete() }
             runCatching { imageDirectory(context, id).deleteRecursively() }
         }
-    }
-
-    fun clearActive(context: Context, baseSessionId: String) {
-        val id = AppPrefs.activeConversationId
-        if (id.isNotBlank()) reset(context, id, baseSessionId)
     }
 
     fun clearAll(context: Context) {
@@ -195,15 +175,6 @@ object ConversationStore {
             it.role == "user" && !it.isToolActivity && !it.isError && it.text.isNotBlank()
         }?.text ?: return DEFAULT_TITLE
         return first.trim().replace(Regex("\\s+"), " ").take(38).ifBlank { DEFAULT_TITLE }
-    }
-
-    private fun cleanupOrphans(context: Context, id: String, messages: List<ChatMessage>) {
-        val referenced = messages.mapNotNull { it.imagePath }.toSet()
-        runCatching {
-            imageDirectory(context, id).listFiles()
-                ?.filter { it.absolutePath !in referenced }
-                ?.forEach { it.delete() }
-        }
     }
 
     private fun toJson(message: ChatMessage): JSONObject {

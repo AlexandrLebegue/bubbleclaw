@@ -7,6 +7,7 @@
     <string name="bubble_channel_description">Maintient le homard BubbleClaw disponible par-dessus les autres applications.</string>
     <string name="bubble_notification_title">BubbleClaw est actif</string>
     <string name="bubble_notification_text">Touchez le homard pour discuter.</string>
+    <string name="bubble_notification_ready">Réponse prête — touchez la bulle pour la lire.</string>
     <string name="bubble_notification_stop">Arrêter</string>
     <string name="bubble_description_open">Bulle BubbleClaw. Touche pour ouvrir la discussion, appui long pour le menu.</string>
     <string name="bubble_description_close">Discussion ouverte. Touche pour la fermer, appui long pour le menu.</string>

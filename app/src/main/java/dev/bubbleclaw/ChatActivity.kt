@@ -30,7 +30,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.ViewModelProvider
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -176,7 +175,7 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
             updatePanelGeometry()
         }
 
-        viewModel = ViewModelProvider(this).get(ChatViewModel::class.java)
+        viewModel = ChatViewModel.get(this)
         conversationTitle.setOnClickListener { showConversationPicker() }
         findViewById<TextView>(R.id.new_conversation_button).setOnClickListener {
             viewModel.newConversation()
@@ -252,10 +251,6 @@ class ChatActivity : AppCompatActivity(), ChatViewModel.Listener {
 
     fun requestCloseFromBubble() {
         closePanel()
-    }
-
-    fun clearConversationFromOutside() {
-        if (::viewModel.isInitialized) viewModel.clearConversation()
     }
 
     private fun closePanel() {
