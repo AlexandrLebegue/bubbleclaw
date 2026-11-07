@@ -23,6 +23,18 @@ import kotlin.math.sin
 
 enum class BubbleState { Idle, Thinking, AnswerReady }
 
+enum class BubbleSkin(val labelRes: Int) {
+    Lobster(R.string.skin_lobster),
+    Paperclip(R.string.skin_paperclip),
+    Panda(R.string.skin_panda),
+    Dog(R.string.skin_dog);
+
+    companion object {
+        fun fromName(name: String?): BubbleSkin =
+            values().firstOrNull { it.name == name } ?: Lobster
+    }
+}
+
 /**
  * Circular coral badge containing the BubbleClaw lobster head.
  * The lobster itself floats inside the badge; the overlay window never moves.
@@ -39,6 +51,13 @@ class LobsterBubbleView @JvmOverloads constructor(
             if (field == value) return
             field = value
             updateAnimation()
+        }
+
+    var skin: BubbleSkin = BubbleSkin.Lobster
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
         }
 
     private val density = resources.displayMetrics.density
@@ -78,6 +97,39 @@ class LobsterBubbleView @JvmOverloads constructor(
         strokeCap = Paint.Cap.ROUND
         color = Color.parseColor("#241A1E")
     }
+    private val squintLightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(2.6f)
+        strokeCap = Paint.Cap.ROUND
+        color = Color.parseColor("#F7F3EE")
+    }
+    private val clipShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        color = Color.parseColor("#66000000")
+    }
+    private val clipPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(2.8f)
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        color = Color.parseColor("#E9E9F2")
+    }
+    private val darkLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(2.2f)
+        strokeCap = Paint.Cap.ROUND
+        color = Color.parseColor("#241A1E")
+    }
+    private val pandaWhitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F7F3EE") }
+    private val pandaBlackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#221D20") }
+    private val pandaPinkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E98B9A") }
+    private val dogFurPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#D89A5B") }
+    private val dogEarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#8C5A38") }
+    private val dogMuzzlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F6E3C8") }
+    private val dogNosePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#2A1D18") }
+    private val tonguePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E97A7A") }
 
     private val smilePath = Path()
     private val antennaLeft = Path()
@@ -260,6 +312,33 @@ class LobsterBubbleView @JvmOverloads constructor(
         canvas.translate(0f, bob - bodyRadius * 0.18f * lift)
         canvas.rotate(rotation, cx, cy)
 
+        when (skin) {
+            BubbleSkin.Lobster -> drawLobster(canvas, lift)
+            BubbleSkin.Paperclip -> drawPaperclip(canvas, lift)
+            BubbleSkin.Panda -> drawPanda(canvas, lift)
+            BubbleSkin.Dog -> drawDog(canvas, lift)
+        }
+
+        if (state == BubbleState.Thinking) {
+            val baseY = cy + bodyRadius * 0.92f
+            for (i in 0..2) {
+                val dotWave = sin((phase + i * 0.18f) * Math.PI * 2).toFloat()
+                dotPaint.alpha = (110 + 120 * dotWave).toInt().coerceIn(30, 255)
+                canvas.drawCircle(cx + (i - 1) * dp(6f), baseY, dp(2.2f), dotPaint)
+            }
+        }
+
+        canvas.restore()
+
+        if (state == BubbleState.AnswerReady) {
+            val badgeX = width - dp(11f)
+            val badgeY = dp(11f)
+            canvas.drawCircle(badgeX, badgeY, dp(7f), badgePaint)
+            canvas.drawCircle(badgeX, badgeY, dp(7f), badgeRingPaint)
+        }
+    }
+
+    private fun drawLobster(canvas: Canvas, lift: Float) {
         if (lift > 0.01f) {
             canvas.save()
             canvas.translate(-bodyRadius * 0.05f * lift, -bodyRadius * 0.62f * lift)
@@ -307,23 +386,101 @@ class LobsterBubbleView @JvmOverloads constructor(
         }
 
         canvas.drawPath(smilePath, linePaint)
-
-        if (state == BubbleState.Thinking) {
-            val baseY = cy + bodyRadius * 0.92f
-            for (i in 0..2) {
-                val dotWave = sin((phase + i * 0.18f) * Math.PI * 2).toFloat()
-                dotPaint.alpha = (110 + 120 * dotWave).toInt().coerceIn(30, 255)
-                canvas.drawCircle(cx + (i - 1) * dp(6f), baseY, dp(2.2f), dotPaint)
-            }
-        }
-
-        canvas.restore()
-
-        if (state == BubbleState.AnswerReady) {
-            val badgeX = width - dp(11f)
-            val badgeY = dp(11f)
-            canvas.drawCircle(badgeX, badgeY, dp(7f), badgePaint)
-            canvas.drawCircle(badgeX, badgeY, dp(7f), badgeRingPaint)
-        }
     }
+
+    private fun drawPaperclip(canvas: Canvas, lift: Float) {
+        val r = bodyRadius
+        val w = r * 0.58f
+        val h = r * 1.08f
+        val round = r * 0.42f
+        clipShadowPaint.strokeWidth = r * 0.30f
+        clipPaint.strokeWidth = r * 0.18f
+        canvas.drawRoundRect(cx - w, cy - h, cx + w, cy + h, round, round, clipShadowPaint)
+        canvas.drawRoundRect(cx - w, cy - h, cx + w, cy + h, round, round, clipPaint)
+        val iw = r * 0.27f
+        val ih = r * 0.76f
+        val inner = r * 0.24f
+        canvas.drawRoundRect(cx - iw, cy - ih, cx + iw, cy + ih, inner, inner, clipShadowPaint)
+        canvas.drawRoundRect(cx - iw, cy - ih, cx + iw, cy + ih, inner, inner, clipPaint)
+
+        val eyeY = cy - r * 0.34f
+        val eyeOffset = r * 0.26f
+        if (lift > 0.18f) {
+            val half = r * 0.11f
+            canvas.drawLine(cx - eyeOffset - half, eyeY, cx - eyeOffset + half, eyeY, squintPaint)
+            canvas.drawLine(cx + eyeOffset - half, eyeY, cx + eyeOffset + half, eyeY, squintPaint)
+        } else {
+            canvas.drawCircle(cx - eyeOffset, eyeY, r * 0.085f, pupilPaint)
+            canvas.drawCircle(cx + eyeOffset, eyeY, r * 0.085f, pupilPaint)
+            canvas.drawCircle(cx - eyeOffset - r * 0.025f, eyeY - r * 0.025f, r * 0.025f, glintPaint)
+            canvas.drawCircle(cx + eyeOffset - r * 0.025f, eyeY - r * 0.025f, r * 0.025f, glintPaint)
+        }
+        canvas.drawArc(
+            cx - r * 0.18f,
+            cy + r * 0.04f,
+            cx + r * 0.18f,
+            cy + r * 0.32f,
+            20f,
+            140f,
+            false,
+            darkLinePaint
+        )
+    }
+
+    private fun drawPanda(canvas: Canvas, lift: Float) {
+        val r = bodyRadius
+        canvas.drawCircle(cx - r * 0.62f, cy - r * 0.62f, r * 0.34f, pandaBlackPaint)
+        canvas.drawCircle(cx + r * 0.62f, cy - r * 0.62f, r * 0.34f, pandaBlackPaint)
+        canvas.drawCircle(cx, cy, r * 0.88f, pandaWhitePaint)
+        canvas.drawOval(cx - r * 0.52f, cy - r * 0.28f, cx - r * 0.10f, cy + r * 0.18f, pandaBlackPaint)
+        canvas.drawOval(cx + r * 0.10f, cy - r * 0.28f, cx + r * 0.52f, cy + r * 0.18f, pandaBlackPaint)
+
+        val eyeY = cy - r * 0.04f
+        val eyeOffset = r * 0.31f
+        if (lift > 0.18f) {
+            val half = r * 0.11f
+            canvas.drawLine(cx - eyeOffset - half, eyeY, cx - eyeOffset + half, eyeY, squintLightPaint)
+            canvas.drawLine(cx + eyeOffset - half, eyeY, cx + eyeOffset + half, eyeY, squintLightPaint)
+        } else {
+            canvas.drawCircle(cx - eyeOffset, eyeY, r * 0.10f, eyePaint)
+            canvas.drawCircle(cx + eyeOffset, eyeY, r * 0.10f, eyePaint)
+            canvas.drawCircle(cx - eyeOffset, eyeY + r * 0.01f, r * 0.055f, pupilPaint)
+            canvas.drawCircle(cx + eyeOffset, eyeY + r * 0.01f, r * 0.055f, pupilPaint)
+        }
+
+        canvas.drawOval(cx - r * 0.10f, cy + r * 0.16f, cx + r * 0.10f, cy + r * 0.30f, pandaBlackPaint)
+        canvas.drawLine(cx, cy + r * 0.30f, cx, cy + r * 0.38f, darkLinePaint)
+        canvas.drawArc(cx - r * 0.18f, cy + r * 0.30f, cx, cy + r * 0.48f, 0f, 100f, false, darkLinePaint)
+        canvas.drawArc(cx, cy + r * 0.30f, cx + r * 0.18f, cy + r * 0.48f, 80f, 100f, false, darkLinePaint)
+        canvas.drawCircle(cx - r * 0.62f, cy + r * 0.18f, r * 0.10f, pandaPinkPaint)
+        canvas.drawCircle(cx + r * 0.62f, cy + r * 0.18f, r * 0.10f, pandaPinkPaint)
+    }
+
+    private fun drawDog(canvas: Canvas, lift: Float) {
+        val r = bodyRadius
+        canvas.drawOval(cx - r * 0.98f, cy - r * 0.78f, cx - r * 0.34f, cy + r * 0.20f, dogEarPaint)
+        canvas.drawOval(cx + r * 0.34f, cy - r * 0.78f, cx + r * 0.98f, cy + r * 0.20f, dogEarPaint)
+        canvas.drawCircle(cx, cy, r * 0.86f, dogFurPaint)
+        canvas.drawOval(cx - r * 0.48f, cy + r * 0.05f, cx + r * 0.48f, cy + r * 0.68f, dogMuzzlePaint)
+
+        val eyeY = cy - r * 0.18f
+        val eyeOffset = r * 0.30f
+        if (lift > 0.18f) {
+            val half = r * 0.10f
+            canvas.drawLine(cx - eyeOffset - half, eyeY, cx - eyeOffset + half, eyeY, squintPaint)
+            canvas.drawLine(cx + eyeOffset - half, eyeY, cx + eyeOffset + half, eyeY, squintPaint)
+        } else {
+            canvas.drawCircle(cx - eyeOffset, eyeY, r * 0.10f, pupilPaint)
+            canvas.drawCircle(cx + eyeOffset, eyeY, r * 0.10f, pupilPaint)
+            canvas.drawCircle(cx - eyeOffset - r * 0.028f, eyeY - r * 0.028f, r * 0.028f, glintPaint)
+            canvas.drawCircle(cx + eyeOffset - r * 0.028f, eyeY - r * 0.028f, r * 0.028f, glintPaint)
+        }
+
+        canvas.drawOval(cx - r * 0.13f, cy + r * 0.20f, cx + r * 0.13f, cy + r * 0.34f, dogNosePaint)
+        canvas.drawLine(cx, cy + r * 0.34f, cx, cy + r * 0.42f, darkLinePaint)
+        canvas.drawArc(cx - r * 0.20f, cy + r * 0.34f, cx, cy + r * 0.52f, 0f, 100f, false, darkLinePaint)
+        canvas.drawArc(cx, cy + r * 0.34f, cx + r * 0.20f, cy + r * 0.52f, 80f, 100f, false, darkLinePaint)
+        canvas.drawOval(cx - r * 0.09f, cy + r * 0.42f, cx + r * 0.09f, cy + r * 0.56f, tonguePaint)
+    }
+
 }

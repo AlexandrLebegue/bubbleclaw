@@ -5,7 +5,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.Gravity
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -97,6 +99,7 @@ class SettingsActivity : AppCompatActivity() {
             bubbleSizeValue.text = getString(R.string.settings_bubble_size_value, size)
             BubbleService.refreshBubbleSize()
         }
+        renderSkinPicker()
 
         testResult = findViewById(R.id.test_result)
         testButton = findViewById(R.id.test_button)
@@ -191,6 +194,55 @@ class SettingsActivity : AppCompatActivity() {
             }
         }.start()
     }
+
+    private fun renderSkinPicker() {
+        val container = findViewById<LinearLayout>(R.id.skin_picker)
+        container.removeAllViews()
+        val selected = AppPrefs.bubbleSkin
+        for (skin in BubbleSkin.values()) {
+            val active = skin == selected
+            val column = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                setPadding(dp(4), dp(8), dp(4), dp(8))
+                isClickable = true
+                isFocusable = true
+                if (active) setBackgroundResource(R.drawable.bg_context_card)
+            }
+            column.addView(
+                LobsterBubbleView(this).apply {
+                    this.skin = skin
+                    state = BubbleState.Idle
+                    layoutParams = LinearLayout.LayoutParams(dp(56), dp(56))
+                    contentDescription = getString(skin.labelRes)
+                }
+            )
+            column.addView(
+                TextView(this).apply {
+                    text = getString(skin.labelRes)
+                    textSize = 11f
+                    gravity = Gravity.CENTER
+                    setTextColor(
+                        ContextCompat.getColor(
+                            this@SettingsActivity,
+                            if (active) R.color.coral_light else R.color.text_secondary
+                        )
+                    )
+                    setPadding(0, dp(4), 0, 0)
+                }
+            )
+            column.setOnClickListener {
+                if (AppPrefs.bubbleSkin == skin) return@setOnClickListener
+                AppPrefs.bubbleSkin = skin
+                BubbleService.refreshBubbleSkin()
+                renderSkinPicker()
+            }
+            container.addView(column)
+        }
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun updateBubbleButton() {
         bubbleButton.setText(
