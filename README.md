@@ -12,10 +12,11 @@ contexte de ce que tu regardais, puis discute avec ton agent.
 
 ## Ce que ça fait
 
-- **Bulle persistante** (`BubbleService`) en service de premier plan, réduite à
-  32 dp, draggable, qui se colle au bord le plus proche et mémorise sa position
-  verticale et son côté (gauche/droite), y compris après rotation. Si elle était
-  active au redémarrage, `BootReceiver` la relance après un reboot.
+- **Bulle persistante** (`BubbleService`) en service de premier plan, taille
+  configurable de 32 à 72 dp (48 dp par défaut), draggable, qui se colle au bord
+  le plus proche et mémorise sa position verticale et son côté (gauche/droite),
+  y compris après rotation. Si elle était active au redémarrage, `BootReceiver`
+  la relance après un reboot.
 - **Capture d'écran sans popup MediaProjection** via l'API Accessibility
   (`takeScreenshot`, Android 11+), image réduite à 1080 px de large, JPEG q70,
   plus une vignette 320 px.
@@ -73,9 +74,9 @@ contexte de ce que tu regardais, puis discute avec ton agent.
 - **Conversations multiples** : chaque fil est enregistré dans
   `filesDir/conversations/<id>.json` (écriture atomique), avec son titre, sa
   date et son identifiant de session. Le titre de la conversation est cliquable
-  dans l'en-tête pour ouvrir un sélecteur compact ; le bouton `+` lance une
-  nouvelle conversation. Le sélecteur marque la conversation active et permet
-  de basculer sans perdre le fil courant.
+  dans l'en-tête pour ouvrir une carte de sélection custom (lignes avec titre,
+  date, coche de conversation active) ; le bouton `+` lance une nouvelle
+  conversation. Le sélecteur permet de basculer sans perdre le fil courant.
 - **Session par conversation** : chaque conversation garde son propre champ
   `user` côté gateway, donc deux fils ne se mélangent pas. Le bouton
   « Effacer la conversation » réinitialise le fil actif et sa session.
@@ -83,9 +84,13 @@ contexte de ce que tu regardais, puis discute avec ton agent.
   référencées par chemin, jamais en base64 dans le JSON.
 - **Historique envoyé au gateway** : tout le fil utile (hors erreurs) dans
   l'ordre, plafonné aux 40 derniers messages. Le premier message de la session
-  porte l'en-tête de contexte et l'image ; les suivants n'envoient que le texte.
-  Une icône appareil-photo dans la barre permet de rattacher une nouvelle
-  capture au message suivant.
+  porte l'en-tête de contexte et, selon le réglage, l'image ; les suivants
+  n'envoient que le texte. Une icône appareil-photo dans la barre permet de
+  rattacher une nouvelle capture au message suivant.
+- **Composeur compact** : à gauche de la saisie, une icône image active ou
+  coupe l'envoi de la capture au gateway (`Non` par défaut, la capture reste
+  locale pour la vignette) ; un trombone ouvre le sélecteur de fichier et joint
+  une image au prochain message. Les deux boutons ont un état visuel corail.
 - **Sessions stables** : chaque conversation réutilise son identifiant de
   session d'un lancement à l'autre, donc elle continue côté gateway.
 - **Animation de réflexion** : bulle dédiée avec le homard en humeur Thinking,
@@ -158,9 +163,8 @@ Interrupteurs :
   active au premier message (max 1500 caractères).
 - **Mode contrôle** (off) : autorise les outils d'action sur l'écran.
 - **Réponses en streaming** (on) : désactivable pour forcer le mode non-stream.
-- **Envoyer la capture d'écran** (`Non` par défaut) : radio bouton `Non`/`Oui`.
-  Sur `Non`, la capture reste locale pour la vignette et le contexte visible,
-  mais l'image n'est jamais jointe aux messages envoyés au gateway.
+- **Taille de la bulle** (48 dp) : slider de 32 à 72 dp, appliqué immédiatement
+  si le service tourne.
 - **Envoyer les rapports de crash** (on) : la trace part uniquement vers l'URL
   du gateway configuré, jamais ailleurs. Désactivé, seul le fichier local
   `filesDir/crash-*.txt` est écrit.

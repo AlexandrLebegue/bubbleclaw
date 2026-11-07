@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.EditText
-import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -18,6 +17,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.slider.Slider
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 class SettingsActivity : AppCompatActivity() {
@@ -81,12 +81,21 @@ class SettingsActivity : AppCompatActivity() {
         stream.setOnCheckedChangeListener { _, checked -> AppPrefs.streamEnabled = checked }
         crashReports.setOnCheckedChangeListener { _, checked -> AppPrefs.crashReportsEnabled = checked }
 
-        val sendScreenshot = findViewById<RadioGroup>(R.id.send_screenshot_group)
-        sendScreenshot.check(
-            if (AppPrefs.sendScreenshot) R.id.send_screenshot_yes else R.id.send_screenshot_no
-        )
-        sendScreenshot.setOnCheckedChangeListener { _, checkedId ->
-            AppPrefs.sendScreenshot = checkedId == R.id.send_screenshot_yes
+        val bubbleSize = findViewById<Slider>(R.id.bubble_size_slider)
+        val bubbleSizeValue = findViewById<TextView>(R.id.bubble_size_value)
+        bubbleSize.valueFrom = AppPrefs.BUBBLE_SIZE_MIN_DP.toFloat()
+        bubbleSize.valueTo = AppPrefs.BUBBLE_SIZE_MAX_DP.toFloat()
+        bubbleSize.stepSize = 4f
+        val initialSize = AppPrefs.BUBBLE_SIZE_MIN_DP +
+            ((AppPrefs.bubbleSizeDp - AppPrefs.BUBBLE_SIZE_MIN_DP) / 4) * 4
+        bubbleSize.value = initialSize.toFloat()
+        bubbleSizeValue.text = getString(R.string.settings_bubble_size_value, initialSize)
+        bubbleSize.addOnChangeListener { _, value, fromUser ->
+            if (!fromUser) return@addOnChangeListener
+            val size = value.toInt().coerceIn(AppPrefs.BUBBLE_SIZE_MIN_DP, AppPrefs.BUBBLE_SIZE_MAX_DP)
+            AppPrefs.bubbleSizeDp = size
+            bubbleSizeValue.text = getString(R.string.settings_bubble_size_value, size)
+            BubbleService.refreshBubbleSize()
         }
 
         testResult = findViewById(R.id.test_result)

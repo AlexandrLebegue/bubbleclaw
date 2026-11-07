@@ -37,8 +37,14 @@
     <string name="chat_conversations">Conversations</string>
     <string name="chat_new_conversation">Nouvelle conversation</string>
     <string name="chat_choose_conversation">Choisir une conversation</string>
-    <string name="chat_new_conversation_action">Nouvelle</string>
-    <string name="chat_active_conversation">Conversation active</string>
+    <string name="chat_send_screenshot_on">Capture d\'écran jointe aux messages : activée</string>
+    <string name="chat_send_screenshot_off">Capture d\'écran jointe aux messages : désactivée</string>
+    <string name="chat_attach_file">Joindre un fichier</string>
+    <string name="chat_attachment_added">Image jointe.</string>
+    <string name="chat_attachment_unsupported">Fichier non pris en charge : choisis une image.</string>
+    <string name="chat_attachment_failed">Impossible de joindre ce fichier.</string>
+    <string name="chat_conversation_new">Nouvelle conversation</string>
+    <string name="chat_conversation_close">Fermer</string>
 
     <string name="settings_title">Réglages</string>
     <string name="settings_gateway">Gateway OpenClaw</string>
@@ -63,10 +69,8 @@
     <string name="settings_include_text">Inclure le texte visible dans le contexte</string>
     <string name="settings_control">Mode contrôle (l\'agent peut agir)</string>
     <string name="settings_stream">Réponses en streaming</string>
-    <string name="settings_send_screenshot">Envoyer la capture d\'écran</string>
-    <string name="settings_send_screenshot_body">Désactivé par défaut : la capture reste locale pour la vignette et n\'est jamais jointe aux messages.</string>
-    <string name="settings_no">Non</string>
-    <string name="settings_yes">Oui</string>
+    <string name="settings_bubble_size">Taille de la bulle</string>
+    <string name="settings_bubble_size_value">%1$d dp</string>
     <string name="settings_crash_reports">Envoyer les rapports de crash</string>
     <string name="settings_crash_reports_body">La trace part uniquement vers l\'URL du gateway configuré, jamais ailleurs. Si tu désactives ce réglage, seul le fichier local est écrit.</string>
     <string name="settings_saved">Réglages enregistrés</string>
