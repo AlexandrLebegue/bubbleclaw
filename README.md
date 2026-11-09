@@ -127,14 +127,11 @@ contexte de ce que tu regardais, puis discute avec ton agent.
 
 ## Build
 
-Prérequis : JDK 21, Android SDK installé dans `/home/dev/android-sdk` (déjà
-référencé par `local.properties`). Le projet cible AGP 8.7.3, Kotlin 2.0.21,
-`compileSdk 35`, `minSdk 30`, JVM 17.
+Prérequis : JDK 21 et Android SDK 35. Renseignez `ANDROID_HOME` vers votre
+installation du SDK (ou `sdk.dir` dans `local.properties`). Le projet cible
+AGP 8.7.3, Kotlin 2.0.21, `compileSdk 35`, `minSdk 30`, JVM 17.
 
 ```bash
-cd /home/dev/projects/bubbleclaw
-ANDROID_HOME=/home/dev/android-sdk \
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
 ./gradlew assembleDebug --no-daemon
 ```
 
@@ -151,7 +148,7 @@ mkdir -p dist
 cp app/build/outputs/apk/debug/app-debug.apk dist/bubbleclaw-debug.apk
 ```
 
-Ne pas modifier `gradle.properties` : la mémoire est calibrée pour cette machine
+Ne pas modifier `gradle.properties` : la mémoire est calibrée pour le build
 (`-Xmx1536m`, 2 workers, pas de daemon).
 
 Installation sur un téléphone branché :
@@ -166,7 +163,7 @@ Ouvrir l'app → **Réglages** (ou appui long sur la bulle → Réglages).
 
 | Champ | Défaut | Rôle |
 |---|---|---|
-| URL du gateway | `http://adresse-du-gateway:18789/v1` | Base HTTP. Avec ou sans `/v1` : BubbleClaw ajoute `/v1` seulement s'il manque. |
+| URL du gateway | vide | Base HTTP de votre gateway, par exemple `http://adresse-du-gateway:18789/v1`. Avec ou sans `/v1` : BubbleClaw ajoute `/v1` seulement s'il manque. |
 | Jeton | vide | Envoyé en `Authorization: Bearer …`. |
 | Modèle | `openclaw/boss` | Champ `model` de la requête, inchangé. |
 | Modèle backend | `hyperqwen/qwen3.8-27b` | Toujours transmis dans l'en-tête `x-openclaw-model` ; une valeur vide est remplacée par ce défaut. Le champ `model` reste `openclaw/boss`. |

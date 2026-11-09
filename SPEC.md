@@ -30,7 +30,7 @@ Default behaviour (no configuration needed at runtime):
   use `java.net.HttpURLConnection`, `org.json`, `Thread`/`Handler` and `Executors`.
 - Gradle build must stay green with `./gradlew assembleDebug`. Do **not** touch `gradle.properties`
   (memory is tuned: -Xmx1536m, 2 workers, no daemon).
-- SDK path: `/home/dev/android-sdk` (already in `local.properties`).
+- SDK path: set `ANDROID_HOME` (or `local.properties`) to your Android SDK installation.
 - Package `dev.bubbleclaw`, sources under `app/src/main/java/dev/bubbleclaw/`.
 - All user-visible strings in **French**. Code comments in English.
 - Do not break the existing manifest entries: accessibility service `canTakeScreenshot` and
@@ -96,7 +96,7 @@ Default behaviour (no configuration needed at runtime):
 
 - `POST {baseUrl}/v1/chat/completions`, header `Authorization: Bearer <token>`, JSON body:
   `{"model": <model>, "user": <sessionId>, "stream": true, "messages": [...]}`.
-- `baseUrl` default `http://adresse-du-gateway:18789/v1`, `model` default `openclaw/boss`,
+- `baseUrl` default empty (example: `http://adresse-du-gateway:18789/v1`), `model` default `openclaw/boss`,
   `sessionId` default `android:bubbleclaw` (stable across launches, editable in settings).
 - Parse SSE lines `data: {...}` → `choices[0].delta.content`; stop on `data: [DONE]`.
   Also support `choices[0].delta.tool_calls` fragments and `finish_reason`.

@@ -23,7 +23,7 @@ object AppPrefs {
     }
 
     var baseUrl: String
-        get() = prefs.getString("baseUrl", "http://adresse-du-gateway:18789/v1")!!
+        get() = prefs.getString("baseUrl", "")!!
         set(value) = prefs.edit().putString("baseUrl", value.trim()).apply()
 
     var token: String
